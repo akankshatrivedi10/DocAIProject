@@ -6,6 +6,7 @@ import Visualizer from './components/Visualizer';
 import CustomerProfilePage from './components/CustomerProfile';
 import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPages';
+import OAuthModal from './components/OAuthModal';
 import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User } from './types';
 import { performStagedSync } from './services/mockSalesforceService';
 import { generateRoleBasedDoc } from './services/geminiService';
@@ -29,6 +30,10 @@ const App: React.FC = () => {
   const [docContent, setDocContent] = useState<string>('');
   const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
 
+  // OAuth State
+  const [isOAuthOpen, setIsOAuthOpen] = useState(false);
+  const [oauthOrgType, setOauthOrgType] = useState<OrgType>(OrgType.PRODUCTION);
+
   const activeOrg = orgs.find(o => o.id === activeOrgId) || null;
 
   const handleAuthSuccess = (user: User, profile: CustomerProfile) => {
@@ -38,13 +43,21 @@ const App: React.FC = () => {
     // If it's a new signup, maybe direct them to dashboard or profile? Defaulting to Dashboard.
   };
 
-  const handleAddOrg = async (type: OrgType) => {
+  const initiateAddOrg = (type: OrgType) => {
+    setOauthOrgType(type);
+    setIsOAuthOpen(true);
+  };
+
+  const handleOAuthSuccess = async (username: string) => {
+    setIsOAuthOpen(false);
+    
     const newOrgId = Date.now().toString();
+    const aliasFromEmail = username.split('@')[0];
     const newOrg: Org = {
       id: newOrgId,
-      name: `${type} Org`,
-      alias: `SF-${type === OrgType.PRODUCTION ? 'PROD' : 'SAND'}-${Math.floor(Math.random() * 100)}`,
-      type: type,
+      name: `${oauthOrgType} Org`,
+      alias: aliasFromEmail || `SF-${oauthOrgType === OrgType.PRODUCTION ? 'PROD' : 'SAND'}`,
+      type: oauthOrgType,
       status: ConnectionStatus.CONNECTING,
       syncState: {
         stage: SyncStage.INIT,
@@ -195,14 +208,14 @@ const App: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Add New Cards */}
             <button 
-                onClick={() => handleAddOrg(OrgType.PRODUCTION)} 
+                onClick={() => initiateAddOrg(OrgType.PRODUCTION)} 
                 className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group h-32"
             >
                 <div className="bg-white p-2 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform"><Plus className="text-blue-600" size={20} /></div>
                 <span className="font-medium text-slate-600">Connect Production</span>
             </button>
             <button 
-                onClick={() => handleAddOrg(OrgType.SANDBOX)} 
+                onClick={() => initiateAddOrg(OrgType.SANDBOX)} 
                 className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group h-32"
             >
                 <div className="bg-white p-2 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform"><Plus className="text-emerald-600" size={20} /></div>
@@ -445,6 +458,14 @@ const App: React.FC = () => {
         {activeTab === Tab.PROFILE && customerProfile && <CustomerProfilePage profile={customerProfile} />}
       </main>
       
+      {/* OAuth Modal */}
+      <OAuthModal 
+        isOpen={isOAuthOpen} 
+        onClose={() => setIsOAuthOpen(false)} 
+        onSuccess={handleOAuthSuccess}
+        orgType={oauthOrgType}
+      />
+
       {/* Syncing Overlay Toast */}
       {activeOrg?.syncState.isSyncing && (
           <div className="fixed bottom-6 right-6 w-80 bg-white rounded-lg shadow-2xl border border-slate-200 p-4 z-50 animate-slide-up">
