@@ -57,6 +57,7 @@ export interface Org {
   type: OrgType;
   status: ConnectionStatus;
   consumerKey?: string;
+  consumerSecret?: string;
   securityToken?: string;
   lastSync?: string;
   metadataSummary?: MetadataSummary;

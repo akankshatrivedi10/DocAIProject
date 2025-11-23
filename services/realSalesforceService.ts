@@ -7,7 +7,7 @@ declare var jsforce: any;
 const PROXY_URL = 'https://node-salesforce-proxy.herokuapp.com/proxy/';
 
 export const performRealSync = async (
-  credentials: { username: string; password?: string; securityToken?: string; loginUrl?: string },
+  credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; consumerSecret?: string; loginUrl?: string },
   onProgress: (stage: SyncStage, progress: number, log: string) => void
 ): Promise<MetadataSummary> => {
   
@@ -19,17 +19,37 @@ export const performRealSync = async (
       onProgress(SyncStage.INIT, 6, "WARNING: Username suggests Sandbox, but connecting to Production URL. This may fail.");
   }
 
-  const conn = new jsforce.Connection({
-    loginUrl: credentials.loginUrl || 'https://login.salesforce.com',
-    proxyUrl: PROXY_URL
-  });
+  // Determine Connection Mode: OAuth2 or Standard SOAP
+  let conn;
+  
+  if (credentials.consumerKey && credentials.consumerSecret) {
+      // Use OAuth2 Resource Owner Password Credential Flow
+      onProgress(SyncStage.INIT, 7, "Configuring OAuth2 Password Flow...");
+      conn = new jsforce.Connection({
+          oauth2: {
+              loginUrl: credentials.loginUrl || 'https://login.salesforce.com',
+              clientId: credentials.consumerKey,
+              clientSecret: credentials.consumerSecret,
+              redirectUri: 'http://localhost:3000' // Placeholder, not used in password flow but required by interface
+          },
+          proxyUrl: PROXY_URL
+      });
+  } else {
+      // Use Standard SOAP Login
+      onProgress(SyncStage.INIT, 7, "Configuring Standard SOAP Login...");
+      conn = new jsforce.Connection({
+        loginUrl: credentials.loginUrl || 'https://login.salesforce.com',
+        proxyUrl: PROXY_URL
+      });
+  }
 
   try {
     // 2. Login
     onProgress(SyncStage.INIT, 10, `Authenticating as ${credentials.username} to ${credentials.loginUrl || 'Default'}...`);
-    const fullPassword = (credentials.password || '') + (credentials.securityToken || '');
     
-    // JSForce login sends SOAP request to login endpoint
+    // JSForce login sends SOAP request OR OAuth request depending on config
+    // For OAuth2 Password Flow, we still call login(user, pass+token)
+    const fullPassword = (credentials.password || '') + (credentials.securityToken || '');
     await conn.login(credentials.username, fullPassword);
     
     onProgress(SyncStage.INIT, 15, "Authentication Successful. Session established.");
@@ -39,6 +59,8 @@ export const performRealSync = async (
     
     if (err.message.includes("INVALID_LOGIN")) {
         errorMessage += " \n\nCheck:\n1. Username/Password are correct.\n2. Security Token is appended (if required).\n3. You are connecting to the correct Environment (Production vs Sandbox). Your username indicates you might need 'Sandbox'.";
+    } else if (err.message.includes("LOGIN_MUST_USE_SECURITY_TOKEN")) {
+        errorMessage += " \n\nCRITICAL: You are accessing from an untrusted network/proxy. You MUST enter your Security Token in the 'Security Token' field. If you don't have one, reset it in Salesforce Setup > My Personal Information > Reset My Security Token.";
     } else {
         errorMessage += " Ensure CORS is enabled or Proxy is available.";
     }

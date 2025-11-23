@@ -50,7 +50,7 @@ const App: React.FC = () => {
   };
 
   // Updated to accept full credentials from OAuthModal
-  const handleOAuthSuccess = async (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; loginUrl: string }) => {
+  const handleOAuthSuccess = async (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; consumerSecret?: string; loginUrl: string }) => {
     setIsOAuthOpen(false);
     
     const newOrgId = Date.now().toString();
@@ -71,6 +71,7 @@ const App: React.FC = () => {
       },
       // Store credentials temporarily for the session (In real app, perform OAuth flow to get token)
       consumerKey: credentials.consumerKey,
+      consumerSecret: credentials.consumerSecret,
       securityToken: credentials.securityToken
     };
 
@@ -84,6 +85,8 @@ const App: React.FC = () => {
           username: credentials.username, 
           password: credentials.password, 
           securityToken: credentials.securityToken,
+          consumerKey: credentials.consumerKey,
+          consumerSecret: credentials.consumerSecret,
           loginUrl: credentials.loginUrl
         }, 
         (stage, progress, log) => {

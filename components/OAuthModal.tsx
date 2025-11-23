@@ -7,7 +7,7 @@ import { TEST_CREDENTIALS } from '../services/testCredentials';
 interface OAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; loginUrl: string }) => void;
+  onSuccess: (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; consumerSecret?: string; loginUrl: string }) => void;
   orgType: OrgType;
 }
 
@@ -19,11 +19,12 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
   const [selectedOrgType, setSelectedOrgType] = useState<OrgType>(orgType);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [securityToken, setSecurityToken] = useState('');
   
   // Advanced Settings
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [consumerKey, setConsumerKey] = useState('');
-  const [securityToken, setSecurityToken] = useState('');
+  const [consumerSecret, setConsumerSecret] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -39,8 +40,9 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
     const creds = TEST_CREDENTIALS.salesforce;
     setUsername(creds.username);
     setPassword(creds.password);
-    setConsumerKey(creds.consumerKey || '');
     setSecurityToken(creds.securityToken || '');
+    setConsumerKey(creds.consumerKey || '');
+    setConsumerSecret(creds.consumerSecret || '');
     
     // Auto-detect sandbox from username suffix
     // Checks for .devcpq (user specific), .dev, .test, .sandbox, .cs
@@ -80,14 +82,16 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
         password,
         securityToken,
         consumerKey,
+        consumerSecret,
         loginUrl
       });
       // Reset state
       setStep('LOGIN');
       setUsername('');
       setPassword('');
-      setConsumerKey('');
       setSecurityToken('');
+      setConsumerKey('');
+      setConsumerSecret('');
       setShowAdvanced(false);
     }, 1500);
   };
@@ -156,6 +160,21 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                    placeholder="••••••••"
                  />
                </div>
+               
+               {/* Security Token - Always Visible */}
+               <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1 flex items-center justify-between">
+                       Security Token
+                       <a href="https://help.salesforce.com/s/articleView?id=sf.user_security_token.htm&type=5" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline text-[10px] font-normal">What is this?</a>
+                    </label>
+                    <input 
+                      type="text" 
+                      value={securityToken}
+                      onChange={(e) => setSecurityToken(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                      placeholder="Ex: uK8x... (Required if outside network)"
+                    />
+               </div>
 
                {/* Advanced Settings Toggle */}
                <div className="pt-2">
@@ -165,7 +184,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                     className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium"
                  >
                     {showAdvanced ? <ChevronUp size={14} /> : <Settings size={14} />}
-                    {showAdvanced ? 'Hide Advanced Connection Settings' : 'Advanced Connection Settings'}
+                    {showAdvanced ? 'Hide Connected App Settings' : 'Show Connected App Settings (OAuth)'}
                  </button>
                </div>
 
@@ -173,24 +192,23 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                {showAdvanced && (
                  <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in slide-in-from-top-2">
                     <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Security Token</label>
-                        <input 
-                          type="text" 
-                          value={securityToken}
-                          onChange={(e) => setSecurityToken(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                          placeholder="Ex: uK8x... (Leave empty if not needed)"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">Required if IP is not allowlisted. Appended to password.</p>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key (Optional)</label>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key (Client ID)</label>
                         <input 
                           type="text" 
                           value={consumerKey}
                           onChange={(e) => setConsumerKey(e.target.value)}
                           className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
                           placeholder="3MVG9..."
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Secret (Client Secret)</label>
+                        <input 
+                          type="password" 
+                          value={consumerSecret}
+                          onChange={(e) => setConsumerSecret(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                          placeholder="908D..."
                         />
                     </div>
                  </div>
