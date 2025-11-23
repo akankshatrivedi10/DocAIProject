@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, Check, Lock, Cloud, KeyRound } from 'lucide-react';
 import { OrgType } from '../types';
 import { TEST_CREDENTIALS } from '../services/testCredentials';
@@ -16,6 +16,14 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+
+  // Auto-fill credentials when modal opens for demo purposes
+  useEffect(() => {
+    if (isOpen) {
+      setUsername(TEST_CREDENTIALS.salesforce.username);
+      setPassword(TEST_CREDENTIALS.salesforce.password);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -109,7 +117,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                     onClick={fillTestCredentials}
                     className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center justify-center gap-1 mx-auto bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 hover:border-emerald-200 transition-colors"
                  >
-                    <KeyRound size={12} /> Auto-fill Test Credentials
+                    <KeyRound size={12} /> Re-fill Test Credentials
                  </button>
              </div>
           </div>
