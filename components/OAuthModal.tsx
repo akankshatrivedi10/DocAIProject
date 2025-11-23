@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
-import { Loader2, Check, Lock, Cloud, KeyRound } from 'lucide-react';
+import { Loader2, Check, Lock, Cloud, KeyRound, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { OrgType } from '../types';
 import { TEST_CREDENTIALS } from '../services/testCredentials';
 
 interface OAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (username: string) => void;
+  onSuccess: (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string }) => void;
   orgType: OrgType;
 }
 
@@ -16,12 +15,20 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  
+  // Advanced Settings
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [consumerKey, setConsumerKey] = useState('');
+  const [securityToken, setSecurityToken] = useState('');
 
   // Auto-fill credentials when modal opens for demo purposes
   useEffect(() => {
     if (isOpen) {
       setUsername(TEST_CREDENTIALS.salesforce.username);
       setPassword(TEST_CREDENTIALS.salesforce.password);
+      // Pre-fill Advanced if needed for realistic demo
+      setConsumerKey(TEST_CREDENTIALS.salesforce.consumerKey);
+      setSecurityToken(TEST_CREDENTIALS.salesforce.securityToken);
     }
   }, [isOpen]);
 
@@ -43,24 +50,35 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
     // Simulate token exchange latency
     setTimeout(() => {
       setLoading(false);
-      onSuccess(username);
-      // Reset state for next time (though component might unmount)
+      // Pass full credentials back
+      onSuccess({
+        username,
+        password,
+        securityToken,
+        consumerKey
+      });
+      // Reset state
       setStep('LOGIN');
       setUsername('');
       setPassword('');
+      setConsumerKey('');
+      setSecurityToken('');
+      setShowAdvanced(false);
     }, 1500);
   };
 
   const fillTestCredentials = () => {
     setUsername(TEST_CREDENTIALS.salesforce.username);
     setPassword(TEST_CREDENTIALS.salesforce.password);
+    setConsumerKey(TEST_CREDENTIALS.salesforce.consumerKey);
+    setSecurityToken(TEST_CREDENTIALS.salesforce.securityToken);
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       {step === 'LOGIN' ? (
-        <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-          <div className="p-8 pb-4">
+        <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+          <div className="p-8 pb-4 overflow-y-auto">
              <div className="flex justify-center mb-8">
                <div className="flex items-center gap-2">
                  <Cloud className="text-blue-500 fill-blue-500" size={48} />
@@ -93,11 +111,51 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                    placeholder="••••••••"
                  />
                </div>
+
+               {/* Advanced Settings Toggle */}
+               <div className="pt-2">
+                 <button 
+                    type="button" 
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium"
+                 >
+                    {showAdvanced ? <ChevronUp size={14} /> : <Settings size={14} />}
+                    {showAdvanced ? 'Hide Advanced Connection Settings' : 'Advanced Connection Settings (OAuth/Token)'}
+                 </button>
+               </div>
+
+               {/* Advanced Fields */}
+               {showAdvanced && (
+                 <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in slide-in-from-top-2">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key (Client ID)</label>
+                        <input 
+                          type="text" 
+                          value={consumerKey}
+                          onChange={(e) => setConsumerKey(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                          placeholder="3MVG9..."
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">From Salesforce Connected App</p>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Security Token</label>
+                        <input 
+                          type="text" 
+                          value={securityToken}
+                          onChange={(e) => setSecurityToken(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                          placeholder="xxxxxxxxxxxxxx"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">Required if IP is not allowlisted</p>
+                    </div>
+                 </div>
+               )}
                
                <button 
                  type="submit" 
                  disabled={loading || !username || !password}
-                 className="w-full bg-[#00A1E0] hover:bg-[#008CC2] text-white font-semibold py-3 rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                 className="w-full bg-[#00A1E0] hover:bg-[#008CC2] text-white font-semibold py-3 rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
                >
                  {loading ? <Loader2 size={20} className="animate-spin" /> : 'Log In'}
                </button>

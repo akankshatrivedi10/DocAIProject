@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
@@ -8,7 +7,8 @@ import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPages';
 import OAuthModal from './components/OAuthModal';
 import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User } from './types';
-import { performStagedSync } from './services/mockSalesforceService';
+// Switched to real service
+import { performRealSync } from './services/realSalesforceService';
 import { generateRoleBasedDoc } from './services/geminiService';
 import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play, Component, ShieldCheck } from 'lucide-react';
 
@@ -48,11 +48,12 @@ const App: React.FC = () => {
     setIsOAuthOpen(true);
   };
 
-  const handleOAuthSuccess = async (username: string) => {
+  // Updated to accept full credentials from OAuthModal
+  const handleOAuthSuccess = async (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string }) => {
     setIsOAuthOpen(false);
     
     const newOrgId = Date.now().toString();
-    const aliasFromEmail = username.split('@')[0];
+    const aliasFromEmail = credentials.username.split('@')[0];
     const newOrg: Org = {
       id: newOrgId,
       name: `${oauthOrgType} Org`,
@@ -64,15 +65,25 @@ const App: React.FC = () => {
         progress: 0,
         logs: [],
         isSyncing: true
-      }
+      },
+      // Store credentials temporarily for the session (In real app, perform OAuth flow to get token)
+      consumerKey: credentials.consumerKey,
+      securityToken: credentials.securityToken
     };
 
     setOrgs(prev => [...prev, newOrg]);
     setActiveOrgId(newOrgId);
 
-    // Start Async Job
+    // Start Async Job using Real Service
     try {
-      const metadata = await performStagedSync((stage, progress, log) => {
+      const metadata = await performRealSync(
+        { 
+          username: credentials.username, 
+          password: credentials.password, 
+          securityToken: credentials.securityToken,
+          loginUrl: oauthOrgType === OrgType.SANDBOX ? 'https://test.salesforce.com' : 'https://login.salesforce.com'
+        }, 
+        (stage, progress, log) => {
         setOrgs(currentOrgs => currentOrgs.map(o => {
           if (o.id === newOrgId) {
             return {
@@ -111,8 +122,23 @@ const App: React.FC = () => {
           })
       }
 
-    } catch (e) {
+    } catch (e: any) {
       console.error("Sync failed", e);
+      // Update org status to error
+      setOrgs(currentOrgs => currentOrgs.map(o => {
+          if (o.id === newOrgId) {
+            return {
+              ...o,
+              status: ConnectionStatus.ERROR,
+              syncState: {
+                ...o.syncState,
+                isSyncing: false,
+                logs: [...o.syncState.logs, `[ERROR] ${e.message}`]
+              }
+            };
+          }
+          return o;
+      }));
     }
   };
 
@@ -172,8 +198,8 @@ const App: React.FC = () => {
           {orgs.map(org => (
             <div key={org.id} className="p-4 flex items-center justify-between">
                <div className="flex items-center gap-3">
-                 <div className={`p-2 rounded-lg ${org.syncState.isSyncing ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                   <RefreshCw size={16} className={org.syncState.isSyncing ? 'animate-spin' : ''} />
+                 <div className={`p-2 rounded-lg ${org.syncState.isSyncing ? 'bg-blue-100 text-blue-600' : (org.status === ConnectionStatus.ERROR ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600')}`}>
+                   {org.status === ConnectionStatus.ERROR ? <AlertCircle size={16} /> : <RefreshCw size={16} className={org.syncState.isSyncing ? 'animate-spin' : ''} />}
                  </div>
                  <div>
                    <div className="font-medium text-slate-800">{org.name} ({org.alias})</div>
@@ -182,7 +208,7 @@ const App: React.FC = () => {
                </div>
                <div className="flex flex-col items-end">
                   <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${org.syncState.progress}%` }}></div>
+                    <div className={`h-full transition-all duration-500 ${org.status === ConnectionStatus.ERROR ? 'bg-red-500' : 'bg-blue-600'}`} style={{ width: `${org.syncState.progress}%` }}></div>
                   </div>
                   <span className="text-xs text-slate-400 mt-1">{org.syncState.progress}%</span>
                </div>
@@ -237,7 +263,9 @@ const App: React.FC = () => {
                                  <p className="text-xs text-slate-500">{org.name}</p>
                              </div>
                         </div>
-                        {org.syncState.isSyncing ? (
+                        {org.status === ConnectionStatus.ERROR ? (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full flex items-center gap-1"><AlertCircle size={10}/> Error</span>
+                        ) : org.syncState.isSyncing ? (
                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> Syncing</span>
                         ) : (
                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1"><CheckCircle size={10}/> Active</span>
@@ -287,11 +315,11 @@ const App: React.FC = () => {
         ) : (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
                 <div className="p-4 bg-slate-50 border-b border-slate-200 flex gap-4 text-sm font-medium text-slate-600 overflow-x-auto whitespace-nowrap">
-                   <div className="px-3 py-1 bg-white rounded border shadow-sm text-blue-600 flex items-center gap-2"><Database size={14}/> Objects ({activeOrg.metadataSummary?.objects.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Code2 size={14}/> Apex ({activeOrg.metadataSummary?.apexClasses.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Workflow size={14}/> Flows ({activeOrg.metadataSummary?.flows.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><ShieldCheck size={14}/> Validations ({activeOrg.metadataSummary?.validationRules.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Component size={14}/> Components ({activeOrg.metadataSummary?.components.length})</div>
+                   <div className="px-3 py-1 bg-white rounded border shadow-sm text-blue-600 flex items-center gap-2"><Database size={14}/> Objects ({activeOrg.metadataSummary?.objects.length || 0})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Code2 size={14}/> Apex ({activeOrg.metadataSummary?.apexClasses.length || 0})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Workflow size={14}/> Flows ({activeOrg.metadataSummary?.flows.length || 0})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><ShieldCheck size={14}/> Validations ({activeOrg.metadataSummary?.validationRules.length || 0})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Component size={14}/> Components ({activeOrg.metadataSummary?.components.length || 0})</div>
                 </div>
                 <div className="p-0 overflow-y-auto flex-1 bg-slate-50/30">
                    {/* Simple list view for objects */}
@@ -318,6 +346,9 @@ const App: React.FC = () => {
                                    <td className="p-4"><button className="text-blue-600 hover:underline">View JSON</button></td>
                                </tr>
                            ))}
+                           {activeOrg.metadataSummary?.objects.length === 0 && (
+                               <tr><td colSpan={5} className="p-8 text-center text-slate-400">No objects found or sync pending.</td></tr>
+                           )}
                        </tbody>
                    </table>
                 </div>
@@ -366,6 +397,7 @@ const App: React.FC = () => {
                                            <div className="text-slate-500 text-xs mt-1">on {t.object} ({t.events.join(', ')})</div>
                                        </div>
                                    ))}
+                                   {activeOrg.metadataSummary.triggers.length === 0 && <div className="text-slate-400 text-sm">No triggers found.</div>}
                                </div>
                            </div>
                            <div className="bg-white p-4 rounded-xl border border-slate-200">
@@ -377,6 +409,7 @@ const App: React.FC = () => {
                                            <div className="text-slate-500 text-xs mt-1">{c.type} • v{c.apiVersion}</div>
                                        </div>
                                    ))}
+                                   {activeOrg.metadataSummary.components.length === 0 && <div className="text-slate-400 text-sm">No components found.</div>}
                                </div>
                            </div>
                        </div>
@@ -397,7 +430,7 @@ const App: React.FC = () => {
                                </div>
                                <div className="flex items-center gap-2 text-sm text-slate-600">
                                    <CheckCircle size={14} className="text-green-500" />
-                                   Opportunity Stages: {activeOrg?.metadataSummary?.objects.find(o => o.name === 'Opportunity')?.fields.find(f => f.name === 'StageName')?.picklistValues?.join(', ')}
+                                   Opportunity Stages: {activeOrg?.metadataSummary?.objects.find(o => o.name === 'Opportunity')?.fields.find(f => f.name === 'StageName')?.picklistValues?.join(', ') || 'Standard'}
                                </div>
                            </div>
                        </div>
@@ -454,7 +487,7 @@ const App: React.FC = () => {
            )}
            {activeOrg && (
              <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded-full border shadow-sm">
-                <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : (activeOrg.status === ConnectionStatus.ERROR ? 'bg-red-500' : 'bg-amber-500')}`}></div>
                 Current Context: <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
              </div>
            )}

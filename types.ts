@@ -56,6 +56,8 @@ export interface Org {
   alias: string;
   type: OrgType;
   status: ConnectionStatus;
+  consumerKey?: string;
+  securityToken?: string;
   lastSync?: string;
   metadataSummary?: MetadataSummary;
   syncState: SyncState;
