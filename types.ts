@@ -1,11 +1,12 @@
+
 export enum Tab {
   DASHBOARD = 'DASHBOARD',
-  CONNECT = 'CONNECT',
+  INTEGRATIONS = 'INTEGRATIONS',
   METADATA = 'METADATA',
-  DOCS = 'DOCS',
-  VISUALS = 'VISUALS',
-  CHAT = 'CHAT',
-  INTEGRATIONS = 'INTEGRATIONS'
+  DEV_HUB = 'DEV_HUB',
+  GTM_HUB = 'GTM_HUB',
+  SALES_ENABLEMENT = 'SALES_ENABLEMENT',
+  CHAT = 'CHAT'
 }
 
 export enum OrgType {
@@ -14,11 +15,35 @@ export enum OrgType {
   SCRATCH = 'Scratch Org'
 }
 
+export enum IntegrationType {
+  SALESFORCE = 'Salesforce',
+  HUBSPOT = 'HubSpot',
+  JIRA = 'Jira',
+  CONFLUENCE = 'Confluence'
+}
+
 export enum ConnectionStatus {
   DISCONNECTED = 'Disconnected',
   CONNECTING = 'Connecting',
   CONNECTED = 'Connected',
   ERROR = 'Error'
+}
+
+export enum SyncStage {
+  IDLE = 'Idle',
+  INIT = 'Initializing Handshake',
+  OBJECTS = 'Fetching Objects & Fields',
+  APEX = 'Indexing Apex & Triggers',
+  FLOWS = 'Analyzing Flows & Processes',
+  CONFIG = 'Retrieving Settings & Permissions',
+  COMPLETE = 'Sync Complete'
+}
+
+export interface SyncState {
+  stage: SyncStage;
+  progress: number; // 0 to 100
+  logs: string[];
+  isSyncing: boolean;
 }
 
 export interface Org {
@@ -29,16 +54,26 @@ export interface Org {
   status: ConnectionStatus;
   lastSync?: string;
   metadataSummary?: MetadataSummary;
+  syncState: SyncState;
+}
+
+export interface Integration {
+  id: string;
+  type: IntegrationType;
+  name: string;
+  status: ConnectionStatus;
+  connectedAt?: Date;
 }
 
 export interface MetadataSummary {
-  apexClasses: number;
-  triggers: number;
-  flows: number;
-  customObjects: number;
-  permissions: number;
+  objects: any[];
+  apexClasses: any[];
+  triggers: any[];
+  flows: any[];
+  validationRules: any[];
+  permissions?: number;
   fetchedAt: Date;
-  details?: any; // Mocking the full JSON payload
+  details?: any; 
 }
 
 export interface ChatMessage {
@@ -47,20 +82,4 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   orgId?: string;
-}
-
-export interface GeneratedDoc {
-  id: string;
-  title: string;
-  type: 'Technical' | 'Process' | 'UserGuide';
-  content: string; // Markdown
-  createdAt: Date;
-  orgId: string;
-}
-
-export interface Diagram {
-  id: string;
-  title: string;
-  mermaidCode: string;
-  orgId: string;
 }

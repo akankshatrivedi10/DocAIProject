@@ -1,240 +1,402 @@
+
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import Visualizer from './components/Visualizer';
-import { Tab, Org, OrgType, ConnectionStatus, MetadataSummary } from './types';
-import { connectOrg, fetchMetadata } from './services/mockSalesforceService';
-import { generateTechnicalDoc } from './services/geminiService';
-import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink } from 'lucide-react';
+import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState } from './types';
+import { performStagedSync } from './services/mockSalesforceService';
+import { generateRoleBasedDoc } from './services/geminiService';
+import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DASHBOARD);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [integrations, setIntegrations] = useState<Integration[]>([
+    { id: 'h1', type: IntegrationType.HUBSPOT, name: 'HubSpot CRM', status: ConnectionStatus.DISCONNECTED },
+    { id: 'j1', type: IntegrationType.JIRA, name: 'Atlassian Jira', status: ConnectionStatus.DISCONNECTED },
+  ]);
   const [docContent, setDocContent] = useState<string>('');
   const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
 
   const activeOrg = orgs.find(o => o.id === activeOrgId) || null;
 
-  const handleConnect = async (type: OrgType) => {
-    setIsConnecting(true);
-    const success = await connectOrg(type);
-    if (success) {
-      const newOrg: Org = {
-        id: Date.now().toString(),
-        name: `${type} Org ${orgs.length + 1}`,
-        alias: `SF-${type.substring(0, 3).toUpperCase()}-0${orgs.length + 1}`,
-        type: type,
-        status: ConnectionStatus.CONNECTED,
-        lastSync: new Date().toLocaleTimeString()
-      };
-      
-      // Auto fetch metadata upon connection
-      const metadata = await fetchMetadata(newOrg.id);
-      newOrg.metadataSummary = metadata;
-      
-      setOrgs([...orgs, newOrg]);
-      setActiveOrgId(newOrg.id);
+  const handleAddOrg = async (type: OrgType) => {
+    const newOrgId = Date.now().toString();
+    const newOrg: Org = {
+      id: newOrgId,
+      name: `${type} Org`,
+      alias: `SF-${type === OrgType.PRODUCTION ? 'PROD' : 'SAND'}-${Math.floor(Math.random() * 100)}`,
+      type: type,
+      status: ConnectionStatus.CONNECTING,
+      syncState: {
+        stage: SyncStage.INIT,
+        progress: 0,
+        logs: [],
+        isSyncing: true
+      }
+    };
+
+    setOrgs(prev => [...prev, newOrg]);
+    setActiveOrgId(newOrgId);
+
+    // Start Async Job
+    try {
+      const metadata = await performStagedSync((stage, progress, log) => {
+        setOrgs(currentOrgs => currentOrgs.map(o => {
+          if (o.id === newOrgId) {
+            return {
+              ...o,
+              syncState: {
+                stage,
+                progress,
+                logs: [...o.syncState.logs, `[${new Date().toLocaleTimeString()}] ${log}`],
+                isSyncing: stage !== SyncStage.COMPLETE
+              },
+              status: stage === SyncStage.COMPLETE ? ConnectionStatus.CONNECTED : ConnectionStatus.CONNECTING,
+              lastSync: stage === SyncStage.COMPLETE ? new Date().toLocaleString() : undefined
+            };
+          }
+          return o;
+        }));
+      });
+
+      // Finalize
+      setOrgs(currentOrgs => currentOrgs.map(o => {
+        if (o.id === newOrgId) {
+          return { ...o, metadataSummary: metadata };
+        }
+        return o;
+      }));
+
+    } catch (e) {
+      console.error("Sync failed", e);
     }
-    setIsConnecting(false);
   };
 
-  const handleGenerateDoc = async (type: string) => {
+  const handleGenerateRoleDoc = async (role: 'DEV' | 'GTM' | 'SALES') => {
     if (!activeOrg || !activeOrg.metadataSummary) return;
     setIsGeneratingDoc(true);
-    const content = await generateTechnicalDoc(type, activeOrg.metadataSummary);
+    const content = await generateRoleBasedDoc(role, activeOrg.metadataSummary);
     setDocContent(content);
     setIsGeneratingDoc(false);
   };
 
+  // -- RENDERERS --
+
   const renderDashboard = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 className="text-slate-500 text-sm font-medium mb-1">Connected Orgs</h3>
-        <div className="text-3xl font-bold text-slate-800">{orgs.length}</div>
-      </div>
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 className="text-slate-500 text-sm font-medium mb-1">Total Metadata Items</h3>
-        <div className="text-3xl font-bold text-slate-800">
-          {orgs.reduce((acc, org) => acc + (org.metadataSummary ? (org.metadataSummary.apexClasses + org.metadataSummary.flows) : 0), 0)}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+          <h3 className="text-slate-500 text-sm font-medium mb-1 relative z-10">Connected Orgs</h3>
+          <div className="text-3xl font-bold text-slate-800 relative z-10">{orgs.filter(o => o.status === ConnectionStatus.CONNECTED).length}</div>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
+          <h3 className="text-slate-500 text-sm font-medium mb-1 relative z-10">Total Metadata Items</h3>
+          <div className="text-3xl font-bold text-slate-800 relative z-10">
+            {orgs.reduce((acc, org) => acc + (org.metadataSummary ? (org.metadataSummary.apexClasses.length + org.metadataSummary.flows.length) : 0), 0)}
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-20"><Shield size={48} /></div>
+          <h3 className="text-indigo-100 text-sm font-medium mb-1">System Status</h3>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span className="font-semibold">AWS Backend Ready</span>
+          </div>
         </div>
       </div>
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-xl shadow-lg text-white">
-        <h3 className="text-blue-100 text-sm font-medium mb-1">Status</h3>
-        <div className="flex items-center gap-2 mt-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-          <span className="font-semibold">Agent Active</span>
+
+      {/* Recent Activity / Jobs */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+           <h3 className="font-semibold text-slate-700">Recent Sync Jobs</h3>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {orgs.length === 0 && <div className="p-8 text-center text-slate-400 italic">No sync jobs found. Connect an org to start.</div>}
+          {orgs.map(org => (
+            <div key={org.id} className="p-4 flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                 <div className={`p-2 rounded-lg ${org.syncState.isSyncing ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                   <RefreshCw size={16} className={org.syncState.isSyncing ? 'animate-spin' : ''} />
+                 </div>
+                 <div>
+                   <div className="font-medium text-slate-800">{org.name} ({org.alias})</div>
+                   <div className="text-xs text-slate-500">{org.syncState.stage}</div>
+                 </div>
+               </div>
+               <div className="flex flex-col items-end">
+                  <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${org.syncState.progress}%` }}></div>
+                  </div>
+                  <span className="text-xs text-slate-400 mt-1">{org.syncState.progress}%</span>
+               </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 
-  const renderConnections = () => (
-    <div className="space-y-6">
+  const renderIntegrations = () => (
+    <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Org Connections</h2>
-        <div className="flex gap-3">
-          <button 
-            onClick={() => handleConnect(OrgType.PRODUCTION)}
-            disabled={isConnecting}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
-          >
-            {isConnecting ? <RefreshCw className="animate-spin" size={16} /> : <Plus size={16} />}
-            Connect Production
-          </button>
-          <button 
-            onClick={() => handleConnect(OrgType.SANDBOX)}
-            disabled={isConnecting}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
-            {isConnecting ? <RefreshCw className="animate-spin" size={16} /> : <Plus size={16} />}
-            Connect Sandbox
-          </button>
+        <div>
+            <h2 className="text-2xl font-bold text-slate-800">Integrations & Connections</h2>
+            <p className="text-slate-500 text-sm">Manage your CRM and Tooling connections securely.</p>
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {orgs.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
-                <p className="text-slate-400">No organizations connected yet.</p>
-            </div>
-        ) : (
-            orgs.map(org => (
-            <div key={org.id} onClick={() => setActiveOrgId(org.id)} className={`p-6 rounded-xl border transition-all cursor-pointer flex justify-between items-center ${activeOrgId === org.id ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50/30' : 'border-slate-200 bg-white hover:border-blue-300'}`}>
-                <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-lg ${org.type === OrgType.PRODUCTION ? 'bg-orange-100 text-orange-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                    <div className="font-bold text-xs uppercase">{org.type.substring(0, 4)}</div>
-                </div>
-                <div>
-                    <h3 className="font-semibold text-slate-800">{org.name}</h3>
-                    <p className="text-sm text-slate-500 font-mono">{org.alias}</p>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
-                        <RefreshCw size={12} />
-                        Last Sync: {org.lastSync}
+      {/* Salesforce Section */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Salesforce Orgs</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Add New Cards */}
+            <button 
+                onClick={() => handleAddOrg(OrgType.PRODUCTION)} 
+                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group h-32"
+            >
+                <div className="bg-white p-2 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform"><Plus className="text-blue-600" size={20} /></div>
+                <span className="font-medium text-slate-600">Connect Production</span>
+            </button>
+            <button 
+                onClick={() => handleAddOrg(OrgType.SANDBOX)} 
+                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group h-32"
+            >
+                <div className="bg-white p-2 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform"><Plus className="text-emerald-600" size={20} /></div>
+                <span className="font-medium text-slate-600">Connect Sandbox</span>
+            </button>
+
+            {/* Existing Orgs */}
+            {orgs.map(org => (
+                <div 
+                  key={org.id} 
+                  onClick={() => setActiveOrgId(org.id)}
+                  className={`relative p-5 rounded-xl border shadow-sm flex flex-col justify-between cursor-pointer transition-all ${activeOrgId === org.id ? 'border-blue-500 ring-1 ring-blue-500 bg-white' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                >
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm ${org.type === OrgType.PRODUCTION ? 'bg-blue-600' : 'bg-emerald-500'}`}>SF</div>
+                             <div>
+                                 <h4 className="font-semibold text-slate-800">{org.alias}</h4>
+                                 <p className="text-xs text-slate-500">{org.name}</p>
+                             </div>
+                        </div>
+                        {org.syncState.isSyncing ? (
+                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> Syncing</span>
+                        ) : (
+                             <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1"><CheckCircle size={10}/> Active</span>
+                        )}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+                        <span>Last Sync: {org.lastSync || 'Never'}</span>
+                        <span className="flex items-center gap-1"><Lock size={10}/> TLS 1.2</span>
                     </div>
                 </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle size={12} /> {org.status}
-                    </span>
-                    <button className="text-xs text-blue-600 hover:underline">View Metadata</button>
-                </div>
-            </div>
-            ))
-        )}
+            ))}
+        </div>
+      </div>
+
+      {/* External Integrations */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">External Tools</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {integrations.map(int => (
+                 <div key={int.id} className="p-5 border border-slate-200 rounded-xl bg-white flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${int.type === IntegrationType.HUBSPOT ? 'bg-orange-500' : 'bg-blue-700'}`}>
+                            {int.type === IntegrationType.HUBSPOT ? 'H' : 'J'}
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-slate-800">{int.name}</h4>
+                            <p className="text-xs text-slate-500">Read/Write Access</p>
+                        </div>
+                    </div>
+                    <button className="text-sm text-slate-600 font-medium px-3 py-1.5 border rounded hover:bg-slate-50">Connect</button>
+                 </div>
+            ))}
+        </div>
       </div>
     </div>
   );
 
-  const renderDocs = () => (
+  const renderMetadataExplorer = () => (
     <div className="h-full flex flex-col">
-        <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-slate-800">Documentation Generator</h2>
-            <div className="flex gap-2">
-                <button 
-                    onClick={() => handleGenerateDoc('Technical Specification')}
-                    disabled={isGeneratingDoc || !activeOrg}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
-                >
-                    {isGeneratingDoc ? 'Generating...' : 'Generate Technical Spec'}
-                </button>
-                <button 
-                    onClick={() => handleGenerateDoc('User Guide')}
-                    disabled={isGeneratingDoc || !activeOrg}
-                    className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50 disabled:opacity-50"
-                >
-                    Generate User Guide
-                </button>
-            </div>
+        <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-800">Metadata Explorer</h2>
+            <p className="text-slate-500 text-sm">Raw metadata viewer. Select an org to view index.</p>
         </div>
         
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-             {!activeOrg ? (
-                 <div className="flex-1 flex items-center justify-center text-slate-400">Select an org to generate docs</div>
-             ) : !docContent ? (
-                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2">
-                     <FileText size={48} className="opacity-20" />
-                     <p>Select a template above to generate documentation using GenAI.</p>
-                 </div>
-             ) : (
-                 <div className="flex-1 overflow-y-auto p-8 prose max-w-none">
-                     <pre className="whitespace-pre-wrap font-sans text-slate-700">{docContent}</pre>
-                 </div>
-             )}
-        </div>
+        {!activeOrg ? (
+             <div className="flex-1 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400">Select a connected org</div>
+        ) : (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex gap-4 text-sm font-medium text-slate-600 overflow-x-auto">
+                   <div className="px-3 py-1 bg-white rounded border shadow-sm text-blue-600">Objects ({activeOrg.metadataSummary?.objects.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer">Apex Classes ({activeOrg.metadataSummary?.apexClasses.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer">Flows ({activeOrg.metadataSummary?.flows.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer">Validation Rules ({activeOrg.metadataSummary?.validationRules.length})</div>
+                </div>
+                <div className="p-0 overflow-y-auto flex-1 bg-slate-50/30">
+                   {/* Simple list view for objects */}
+                   <table className="w-full text-sm text-left">
+                       <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                           <tr>
+                               <th className="p-4">Name</th>
+                               <th className="p-4">Type</th>
+                               <th className="p-4">Field Count</th>
+                               <th className="p-4">Action</th>
+                           </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                           {activeOrg.metadataSummary?.objects.map((obj: any, i: number) => (
+                               <tr key={i} className="hover:bg-white">
+                                   <td className="p-4 font-medium text-slate-700">{obj.label} <span className="text-xs text-slate-400 ml-1 font-mono">({obj.name})</span></td>
+                                   <td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${obj.type === 'Standard' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{obj.type}</span></td>
+                                   <td className="p-4 text-slate-500">{obj.fields.length}</td>
+                                   <td className="p-4"><button className="text-blue-600 hover:underline">View JSON</button></td>
+                               </tr>
+                           ))}
+                       </tbody>
+                   </table>
+                </div>
+            </div>
+        )}
     </div>
   );
+
+  const renderWorkspace = (title: string, role: 'DEV' | 'GTM' | 'SALES', icon: any) => {
+    const Icon = icon;
+    return (
+        <div className="h-full flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white border rounded-lg shadow-sm"><Icon className="text-slate-700" size={24} /></div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">{title}</h2>
+                        <p className="text-slate-500 text-sm">AI-powered workspace tailored for {role.toLowerCase()} roles.</p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    {role === 'GTM' && <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700" onClick={() => setActiveTab(Tab.GTM_HUB)}>Visualize Flows</button>}
+                    <button 
+                        onClick={() => handleGenerateRoleDoc(role)}
+                        disabled={isGeneratingDoc || !activeOrg}
+                        className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {isGeneratingDoc ? <RefreshCw className="animate-spin" size={14} /> : <FileText size={14} />}
+                        Generate Guide
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+                {/* Left Panel: Context/Shortcuts */}
+                <div className="space-y-6 overflow-y-auto pr-2">
+                   {/* Role specific content cards */}
+                   {role === 'DEV' && activeOrg?.metadataSummary && (
+                       <div className="bg-white p-4 rounded-xl border border-slate-200">
+                           <h3 className="font-semibold mb-3 flex items-center gap-2"><Code2 size={16}/> Code Insights</h3>
+                           <div className="space-y-2">
+                               {activeOrg.metadataSummary.apexClasses.slice(0, 3).map((c: any, i: number) => (
+                                   <div key={i} className="p-3 bg-slate-50 rounded border border-slate-100 text-sm">
+                                       <div className="font-mono text-blue-700 font-medium">{c.name}</div>
+                                       <div className="text-slate-500 text-xs mt-1">{c.description}</div>
+                                   </div>
+                               ))}
+                           </div>
+                       </div>
+                   )}
+                    {role === 'GTM' && (
+                       <div className="bg-white p-4 rounded-xl border border-slate-200">
+                           <h3 className="font-semibold mb-3 flex items-center gap-2"><Workflow size={16}/> Process Maps</h3>
+                           <Visualizer activeOrg={activeOrg} />
+                       </div>
+                   )}
+                   {role === 'SALES' && (
+                       <div className="bg-white p-4 rounded-xl border border-slate-200">
+                           <h3 className="font-semibold mb-3 flex items-center gap-2"><GraduationCap size={16}/> Enablement Checks</h3>
+                           <div className="space-y-2">
+                               <div className="flex items-center gap-2 text-sm text-slate-600">
+                                   <CheckCircle size={14} className="text-green-500" />
+                                   Lead Validation Rules Analyzed
+                               </div>
+                               <div className="flex items-center gap-2 text-sm text-slate-600">
+                                   <CheckCircle size={14} className="text-green-500" />
+                                   Opportunity Stage Gates Mapped
+                               </div>
+                           </div>
+                       </div>
+                   )}
+                </div>
+
+                {/* Right Panel: Generated Content */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full">
+                    <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <span className="text-xs font-semibold text-slate-500 uppercase">Generative Output</span>
+                        {docContent && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">AI Generated</span>}
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-6 prose prose-sm max-w-none">
+                         {!docContent ? (
+                             <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-2">
+                                     <FileText className="opacity-20" size={24} />
+                                 </div>
+                                 <p>Click "Generate Guide" to create {role.toLowerCase()} documentation.</p>
+                             </div>
+                         ) : (
+                             <div className="whitespace-pre-wrap font-sans text-slate-700">{docContent}</div>
+                         )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+  };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50 font-sans">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className="flex-1 p-8 h-screen overflow-y-auto">
+      <main className="flex-1 p-8 h-screen overflow-y-auto relative">
+        {/* Global Context Bar */}
+        <div className="flex justify-end items-center gap-4 mb-4">
+           {activeOrg && (
+             <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded-full border shadow-sm">
+                <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                Current Context: <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
+             </div>
+           )}
+        </div>
+
         {activeTab === Tab.DASHBOARD && renderDashboard()}
-        {activeTab === Tab.CONNECT && renderConnections()}
-        
-        {activeTab === Tab.METADATA && (
-           <div className="bg-white p-8 rounded-xl border border-slate-200 text-center">
-               <Database size={48} className="mx-auto text-slate-300 mb-4" />
-               <h3 className="text-lg font-medium text-slate-800">Metadata Explorer</h3>
-               <p className="text-slate-500 mt-2">Detailed metadata tree view is available when an org is connected.</p>
-               {activeOrg && activeOrg.metadataSummary && (
-                   <div className="mt-8 text-left max-w-md mx-auto bg-slate-50 p-4 rounded border font-mono text-sm">
-                       <pre>{JSON.stringify(activeOrg.metadataSummary, null, 2)}</pre>
-                   </div>
-               )}
-           </div>
-        )}
-
-        {activeTab === Tab.DOCS && renderDocs()}
-        {activeTab === Tab.VISUALS && <Visualizer activeOrg={activeOrg} />}
+        {activeTab === Tab.INTEGRATIONS && renderIntegrations()}
+        {activeTab === Tab.METADATA && renderMetadataExplorer()}
+        {activeTab === Tab.DEV_HUB && renderWorkspace('Developer Workspace', 'DEV', Code2)}
+        {activeTab === Tab.GTM_HUB && renderWorkspace('BA & GTM Hub', 'GTM', Workflow)}
+        {activeTab === Tab.SALES_ENABLEMENT && renderWorkspace('Sales Onboarding', 'SALES', GraduationCap)}
         {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} />}
-        
-        {activeTab === Tab.INTEGRATIONS && (
-            <div className="bg-white p-6 rounded-xl border border-slate-200">
-                <h2 className="text-lg font-semibold mb-4">External Integrations</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 border rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-orange-500 rounded flex items-center justify-center text-white font-bold">H</div>
-                            <div>
-                                <div className="font-medium">HubSpot</div>
-                                <div className="text-xs text-slate-500">CRM Data Sync</div>
-                            </div>
-                        </div>
-                        <button className="text-sm text-blue-600 font-medium">Connect</button>
-                    </div>
-                    <div className="p-4 border rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center text-white font-bold">J</div>
-                            <div>
-                                <div className="font-medium">Jira</div>
-                                <div className="text-xs text-slate-500">Ticket Creation</div>
-                            </div>
-                        </div>
-                        <button className="text-sm text-blue-600 font-medium">Connect</button>
-                    </div>
-                </div>
-            </div>
-        )}
       </main>
-
-      {/* Status Bar */}
-      {activeOrg && (
-          <div className="fixed bottom-4 right-8 bg-white px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-2 text-sm z-50">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-              <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-slate-500">Metadata Cached</span>
+      
+      {/* Syncing Overlay Toast */}
+      {activeOrg?.syncState.isSyncing && (
+          <div className="fixed bottom-6 right-6 w-80 bg-white rounded-lg shadow-2xl border border-slate-200 p-4 z-50 animate-slide-up">
+              <div className="flex justify-between items-center mb-2">
+                  <span className="font-semibold text-sm text-slate-800">Syncing Metadata...</span>
+                  <span className="text-xs font-mono text-blue-600">{activeOrg.syncState.progress}%</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-1.5 mb-3">
+                  <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${activeOrg.syncState.progress}%` }}></div>
+              </div>
+              <div className="text-xs text-slate-500 truncate">
+                  {activeOrg.syncState.logs[activeOrg.syncState.logs.length - 1]}
+              </div>
           </div>
       )}
     </div>
   );
 };
-
-// Icon import fix for display
-import { Database } from 'lucide-react';
 
 export default App;

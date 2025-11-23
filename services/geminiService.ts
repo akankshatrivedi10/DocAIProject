@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ChatMessage, MetadataSummary } from "../types";
 
@@ -46,7 +47,7 @@ export const generateChatResponse = async (
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.2, // Low temperature for factual accuracy
+        temperature: 0.2,
       }
     });
     
@@ -85,20 +86,25 @@ export const generateDiagramSyntax = async (description: string, metadataContext
   }
 };
 
-export const generateTechnicalDoc = async (type: string, metadataContext: MetadataSummary): Promise<string> => {
+export const generateRoleBasedDoc = async (role: 'DEV' | 'GTM' | 'SALES', metadataContext: MetadataSummary): Promise<string> => {
     const client = getClient();
     if (!client) return "";
   
+    let rolePrompt = "";
+    if (role === 'DEV') {
+        rolePrompt = "Task: Generate a Technical Specification including Apex architecture, Trigger patterns, and API dependencies. Focus on robustness and scalability. Include a Code Reference section.";
+    } else if (role === 'GTM') {
+        rolePrompt = "Task: Generate a Functional Process Guide. Focus on key user journeys (Lead to Cash, Support Resolution). Map Flows to business steps. Identify automation touchpoints.";
+    } else if (role === 'SALES') {
+        rolePrompt = "Task: Generate a Sales Onboarding & Enablement Guide. Explain how to enter data correctly, what Fields are mandatory (Validation Rules), and what happens after they close a deal (Automation). Tone should be simple and instructional.";
+    }
+
     const prompt = `
     Metadata: ${JSON.stringify(metadataContext.details)}
     
-    Task: Write a comprehensive ${type} document for this Salesforce Org.
+    ${rolePrompt}
+    
     Format: Markdown.
-    Structure:
-    1. Overview
-    2. Key Objects & Relationships
-    3. Automation Logic (Flows/Triggers)
-    4. Recommendations for improvement
     `;
   
     try {
