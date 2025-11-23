@@ -1,3 +1,4 @@
+
 import { MetadataSummary, SyncStage, ObjectDef, FlowDef, ApexClassDef, ValidationRuleDef, ApexTriggerDef, ComponentDef, ProfileDef, SharingRuleDef } from '../types';
 
 // Declare jsforce global since it's loaded via script tag
@@ -13,6 +14,11 @@ export const performRealSync = async (
   // 1. Initialize Connection
   onProgress(SyncStage.INIT, 5, "Initializing JSForce Connection...");
   
+  // Explicitly check for sandbox URL if username indicates it, to warn user if mismatch
+  if (credentials.username.includes('.dev') && (!credentials.loginUrl || credentials.loginUrl.includes('login.salesforce'))) {
+      onProgress(SyncStage.INIT, 6, "WARNING: Username suggests Sandbox, but connecting to Production URL. This may fail.");
+  }
+
   const conn = new jsforce.Connection({
     loginUrl: credentials.loginUrl || 'https://login.salesforce.com',
     proxyUrl: PROXY_URL
@@ -20,14 +26,24 @@ export const performRealSync = async (
 
   try {
     // 2. Login
-    onProgress(SyncStage.INIT, 10, `Authenticating as ${credentials.username}...`);
+    onProgress(SyncStage.INIT, 10, `Authenticating as ${credentials.username} to ${credentials.loginUrl || 'Default'}...`);
     const fullPassword = (credentials.password || '') + (credentials.securityToken || '');
+    
+    // JSForce login sends SOAP request to login endpoint
     await conn.login(credentials.username, fullPassword);
     
     onProgress(SyncStage.INIT, 15, "Authentication Successful. Session established.");
   } catch (err: any) {
     console.error("Login Failed", err);
-    throw new Error(`Salesforce Login Failed: ${err.message}. Ensure you are using a Proxy or CORS is configured.`);
+    let errorMessage = `Salesforce Login Failed: ${err.message}.`;
+    
+    if (err.message.includes("INVALID_LOGIN")) {
+        errorMessage += " \n\nCheck:\n1. Username/Password are correct.\n2. Security Token is appended (if required).\n3. You are connecting to the correct Environment (Production vs Sandbox). Your username indicates you might need 'Sandbox'.";
+    } else {
+        errorMessage += " Ensure CORS is enabled or Proxy is available.";
+    }
+
+    throw new Error(errorMessage);
   }
 
   // 3. Fetch Objects (Standard & Custom)

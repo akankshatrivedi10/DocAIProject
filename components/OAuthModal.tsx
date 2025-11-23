@@ -1,18 +1,22 @@
+
 import React, { useState, useEffect } from 'react';
-import { Loader2, Check, Lock, Cloud, KeyRound, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Loader2, Check, Lock, Cloud, KeyRound, ChevronDown, ChevronUp, Settings, Globe } from 'lucide-react';
 import { OrgType } from '../types';
 import { TEST_CREDENTIALS } from '../services/testCredentials';
 
 interface OAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string }) => void;
+  onSuccess: (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; loginUrl: string }) => void;
   orgType: OrgType;
 }
 
 const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, orgType }) => {
   const [step, setStep] = useState<'LOGIN' | 'CONSENT'>('LOGIN');
   const [loading, setLoading] = useState(false);
+  
+  // Login State
+  const [selectedOrgType, setSelectedOrgType] = useState<OrgType>(orgType);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
@@ -21,16 +25,31 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
   const [consumerKey, setConsumerKey] = useState('');
   const [securityToken, setSecurityToken] = useState('');
 
-  // Auto-fill credentials when modal opens for demo purposes
   useEffect(() => {
     if (isOpen) {
-      setUsername(TEST_CREDENTIALS.salesforce.username);
-      setPassword(TEST_CREDENTIALS.salesforce.password);
-      // Pre-fill Advanced if needed for realistic demo
-      setConsumerKey(TEST_CREDENTIALS.salesforce.consumerKey);
-      setSecurityToken(TEST_CREDENTIALS.salesforce.securityToken);
+      setSelectedOrgType(orgType);
+      // If we have credentials in the test file, auto-populate them
+      if (TEST_CREDENTIALS.salesforce.username) {
+          fillTestCredentials();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, orgType]);
+
+  const fillTestCredentials = () => {
+    const creds = TEST_CREDENTIALS.salesforce;
+    setUsername(creds.username);
+    setPassword(creds.password);
+    setConsumerKey(creds.consumerKey || '');
+    setSecurityToken(creds.securityToken || '');
+    
+    // Auto-detect sandbox from username suffix
+    // Checks for .devcpq (user specific), .dev, .test, .sandbox, .cs
+    if (creds.username.match(/(\.dev|\.test|\.sandbox|\.cs|\.devcpq)/i)) {
+        setSelectedOrgType(OrgType.SANDBOX);
+    } else {
+        setSelectedOrgType(OrgType.PRODUCTION);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -42,7 +61,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
     setTimeout(() => {
       setLoading(false);
       setStep('CONSENT');
-    }, 1500);
+    }, 1200);
   };
 
   const handleAllow = () => {
@@ -50,12 +69,18 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
     // Simulate token exchange latency
     setTimeout(() => {
       setLoading(false);
+      // Determine correct Login URL based on selection
+      const loginUrl = selectedOrgType === OrgType.SANDBOX 
+        ? 'https://test.salesforce.com' 
+        : 'https://login.salesforce.com';
+
       // Pass full credentials back
       onSuccess({
         username,
         password,
         securityToken,
-        consumerKey
+        consumerKey,
+        loginUrl
       });
       // Reset state
       setStep('LOGIN');
@@ -67,27 +92,47 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
     }, 1500);
   };
 
-  const fillTestCredentials = () => {
-    setUsername(TEST_CREDENTIALS.salesforce.username);
-    setPassword(TEST_CREDENTIALS.salesforce.password);
-    setConsumerKey(TEST_CREDENTIALS.salesforce.consumerKey);
-    setSecurityToken(TEST_CREDENTIALS.salesforce.securityToken);
-  };
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       {step === 'LOGIN' ? (
         <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
           <div className="p-8 pb-4 overflow-y-auto">
-             <div className="flex justify-center mb-8">
+             <div className="flex justify-center mb-6">
                <div className="flex items-center gap-2">
                  <Cloud className="text-blue-500 fill-blue-500" size={48} />
                  <span className="text-2xl font-bold text-slate-700">salesforce</span>
                </div>
              </div>
 
+             {/* Environment Switcher */}
+             <div className="flex justify-center mb-6">
+                 <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-medium w-full">
+                     <button 
+                        type="button"
+                        onClick={() => setSelectedOrgType(OrgType.PRODUCTION)}
+                        className={`flex-1 px-3 py-1.5 rounded-md transition-all ${selectedOrgType === OrgType.PRODUCTION ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
+                     >
+                         Production
+                     </button>
+                     <button 
+                        type="button"
+                        onClick={() => setSelectedOrgType(OrgType.SANDBOX)}
+                        className={`flex-1 px-3 py-1.5 rounded-md transition-all ${selectedOrgType === OrgType.SANDBOX ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
+                     >
+                         Sandbox
+                     </button>
+                 </div>
+             </div>
+             
+             {/* Login URL Indicator */}
+             <div className="text-center mb-4">
+                 <p className="text-[10px] text-slate-400 font-mono">
+                     Target: {selectedOrgType === OrgType.SANDBOX ? 'test.salesforce.com' : 'login.salesforce.com'}
+                 </p>
+             </div>
+
              <h2 className="text-center text-lg font-medium text-slate-700 mb-6">
-                Log In to {orgType === OrgType.PRODUCTION ? 'Production' : 'Sandbox'}
+                Log In to {selectedOrgType}
              </h2>
 
              <form onSubmit={handleLogin} className="space-y-4">
@@ -97,8 +142,8 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                    type="text" 
                    value={username}
                    onChange={(e) => setUsername(e.target.value)}
-                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                   placeholder="user@company.com"
+                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                   placeholder="user@company.com.sandbox"
                  />
                </div>
                <div>
@@ -107,7 +152,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                    type="password" 
                    value={password}
                    onChange={(e) => setPassword(e.target.value)}
-                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
                    placeholder="••••••••"
                  />
                </div>
@@ -120,7 +165,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                     className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium"
                  >
                     {showAdvanced ? <ChevronUp size={14} /> : <Settings size={14} />}
-                    {showAdvanced ? 'Hide Advanced Connection Settings' : 'Advanced Connection Settings (OAuth/Token)'}
+                    {showAdvanced ? 'Hide Advanced Connection Settings' : 'Advanced Connection Settings'}
                  </button>
                </div>
 
@@ -128,7 +173,18 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                {showAdvanced && (
                  <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in slide-in-from-top-2">
                     <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key (Client ID)</label>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Security Token</label>
+                        <input 
+                          type="text" 
+                          value={securityToken}
+                          onChange={(e) => setSecurityToken(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                          placeholder="Ex: uK8x... (Leave empty if not needed)"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">Required if IP is not allowlisted. Appended to password.</p>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key (Optional)</label>
                         <input 
                           type="text" 
                           value={consumerKey}
@@ -136,18 +192,6 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, org
                           className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
                           placeholder="3MVG9..."
                         />
-                        <p className="text-[10px] text-slate-400 mt-1">From Salesforce Connected App</p>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Security Token</label>
-                        <input 
-                          type="text" 
-                          value={securityToken}
-                          onChange={(e) => setSecurityToken(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                          placeholder="xxxxxxxxxxxxxx"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">Required if IP is not allowlisted</p>
                     </div>
                  </div>
                )}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
@@ -49,16 +50,18 @@ const App: React.FC = () => {
   };
 
   // Updated to accept full credentials from OAuthModal
-  const handleOAuthSuccess = async (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string }) => {
+  const handleOAuthSuccess = async (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; loginUrl: string }) => {
     setIsOAuthOpen(false);
     
     const newOrgId = Date.now().toString();
     const aliasFromEmail = credentials.username.split('@')[0];
+    const isSandbox = credentials.loginUrl.includes('test.salesforce.com');
+
     const newOrg: Org = {
       id: newOrgId,
-      name: `${oauthOrgType} Org`,
-      alias: aliasFromEmail || `SF-${oauthOrgType === OrgType.PRODUCTION ? 'PROD' : 'SAND'}`,
-      type: oauthOrgType,
+      name: isSandbox ? 'Sandbox Org' : 'Production Org',
+      alias: aliasFromEmail || `SF-${isSandbox ? 'SAND' : 'PROD'}`,
+      type: isSandbox ? OrgType.SANDBOX : OrgType.PRODUCTION,
       status: ConnectionStatus.CONNECTING,
       syncState: {
         stage: SyncStage.INIT,
@@ -81,7 +84,7 @@ const App: React.FC = () => {
           username: credentials.username, 
           password: credentials.password, 
           securityToken: credentials.securityToken,
-          loginUrl: oauthOrgType === OrgType.SANDBOX ? 'https://test.salesforce.com' : 'https://login.salesforce.com'
+          loginUrl: credentials.loginUrl
         }, 
         (stage, progress, log) => {
         setOrgs(currentOrgs => currentOrgs.map(o => {
