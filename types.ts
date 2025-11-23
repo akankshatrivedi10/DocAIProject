@@ -35,10 +35,11 @@ export enum ConnectionStatus {
 export enum SyncStage {
   IDLE = 'Idle',
   INIT = 'Initializing Handshake',
-  OBJECTS = 'Fetching Objects & Fields',
+  OBJECTS = 'Fetching Objects & Record Types',
   APEX = 'Indexing Apex & Triggers',
-  FLOWS = 'Analyzing Flows & Processes',
-  CONFIG = 'Retrieving Settings & Permissions',
+  FLOWS = 'Analyzing Flows & Process Builders',
+  COMPONENTS = 'Scanning LWC & Aura Components',
+  CONFIG = 'Retrieving Profiles & Sharing Settings',
   COMPLETE = 'Sync Complete'
 }
 
@@ -68,15 +69,110 @@ export interface Integration {
   connectedAt?: Date;
 }
 
+// --- Detailed Metadata Models ---
+
+export interface FieldDef {
+  name: string;
+  label: string;
+  type: string;
+  length?: number;
+  required?: boolean;
+  helpText?: string;
+  picklistValues?: string[];
+}
+
+export interface RecordTypeDef {
+  name: string;
+  developerName: string;
+  active: boolean;
+  businessProcess?: string; // e.g. Support Process
+}
+
+export interface ObjectDef {
+  name: string;
+  label: string;
+  type: 'Standard' | 'Custom';
+  fields: FieldDef[];
+  recordTypes: RecordTypeDef[];
+  relationships?: { name: string; type: 'Lookup' | 'MasterDetail'; relatedTo: string }[];
+}
+
+export interface ApexClassDef {
+  name: string;
+  type: 'Class' | 'Interface';
+  apiVersion: number;
+  status: 'Active' | 'Inactive';
+  body: string; // Simplified for mock
+  description?: string;
+  dependencies?: string[];
+}
+
+export interface ApexTriggerDef {
+  name: string;
+  object: string;
+  events: string[]; // e.g., 'before insert'
+  body?: string;
+  status: 'Active' | 'Inactive';
+}
+
+export interface FlowNode {
+  name: string;
+  type: 'Screen' | 'Action' | 'Decision' | 'Assignment' | 'Loop';
+  label: string;
+  description?: string;
+}
+
+export interface FlowDef {
+  name: string;
+  label: string;
+  type: 'Screen Flow' | 'Autolaunched Flow' | 'Triggered Flow' | 'Process Builder';
+  status: 'Active' | 'Draft';
+  triggerType?: 'RecordBeforeSave' | 'RecordAfterSave' | 'Schedule' | 'PlatformEvent';
+  triggerObject?: string;
+  nodes: FlowNode[];
+  description?: string;
+}
+
+export interface ValidationRuleDef {
+  name: string;
+  object: string;
+  active: boolean;
+  errorCondition: string;
+  errorMessage: string;
+}
+
+export interface ComponentDef {
+  name: string;
+  type: 'LWC' | 'Aura';
+  apiVersion: number;
+  description?: string;
+}
+
+export interface ProfileDef {
+  name: string;
+  userLicense: string;
+  custom: boolean;
+}
+
+export interface SharingRuleDef {
+  object: string;
+  label: string;
+  accessLevel: 'Read' | 'Edit' | 'All';
+  type: 'OwnerBased' | 'CriteriaBased';
+}
+
 export interface MetadataSummary {
-  objects: any[];
-  apexClasses: any[];
-  triggers: any[];
-  flows: any[];
-  validationRules: any[];
+  objects: ObjectDef[];
+  apexClasses: ApexClassDef[];
+  triggers: ApexTriggerDef[];
+  flows: FlowDef[];
+  validationRules: ValidationRuleDef[];
+  components: ComponentDef[];
+  profiles: ProfileDef[];
+  sharingRules: SharingRuleDef[];
   permissions?: number;
   fetchedAt: Date;
-  details?: any; 
+  details?: any; // Full JSON dump for AI context
 }
 
 export interface ChatMessage {

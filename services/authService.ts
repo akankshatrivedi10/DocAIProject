@@ -1,5 +1,6 @@
 
 import { CustomerProfile, SubscriptionPlan, UserRole, User } from '../types';
+import { TEST_CREDENTIALS } from './testCredentials';
 
 // Simulate backend latency
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -18,41 +19,82 @@ export const login = async (email: string, password: string): Promise<AuthRespon
     throw new Error('Invalid credentials');
   }
 
-  // Return a mock existing user
-  const user: User = {
-    id: 'u_existing_1',
-    name: 'Demo User',
-    email: email,
-    role: UserRole.ADMIN,
-    status: 'Active',
-    lastLogin: new Date()
-  };
+  let user: User;
+  let profile: CustomerProfile;
 
-  const profile: CustomerProfile = {
-    id: 'cust_demo_1',
-    companyName: 'Demo Company Inc.',
-    industry: 'Technology',
-    domain: email.split('@')[1] || 'demo.com',
-    subscription: {
-      plan: SubscriptionPlan.PRO,
-      status: 'Trialing',
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      trialStartDate: new Date(),
-      trialEndDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days left
-      seatsTotal: 5,
-      seatsUsed: 1
-    },
-    users: [user],
-    transactions: [],
-    usage: {
-      connectedOrgs: 1,
-      metadataItemsAnalyzed: 450,
-      documentsGenerated: 5,
-      storageUsedMB: 12,
-      apiCallsThisMonth: 120
-    }
-  };
+  // Specific Test User Logic
+  if (email === TEST_CREDENTIALS.app.email) {
+      user = {
+        id: 'u_akanksha',
+        name: TEST_CREDENTIALS.app.name,
+        email: TEST_CREDENTIALS.app.email,
+        role: UserRole.ADMIN,
+        status: 'Active',
+        lastLogin: new Date()
+      };
+
+      profile = {
+        id: 'cust_brahmcloud',
+        companyName: TEST_CREDENTIALS.app.company,
+        industry: 'Technology',
+        domain: 'brahmcloud.com',
+        subscription: {
+          plan: SubscriptionPlan.PRO,
+          status: 'Active',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+          seatsTotal: 20,
+          seatsUsed: 1
+        },
+        users: [user],
+        transactions: [
+             { id: 'tx_b1', date: new Date(), amount: 490, currency: 'USD', description: 'Annual Pro Plan', status: 'Paid', invoiceUrl: '#' }
+        ],
+        usage: {
+          connectedOrgs: 0,
+          metadataItemsAnalyzed: 0,
+          documentsGenerated: 0,
+          storageUsedMB: 0,
+          apiCallsThisMonth: 0
+        }
+      };
+  } else {
+      // Default Mock User
+      user = {
+        id: 'u_existing_1',
+        name: 'Demo User',
+        email: email,
+        role: UserRole.ADMIN,
+        status: 'Active',
+        lastLogin: new Date()
+      };
+
+      profile = {
+        id: 'cust_demo_1',
+        companyName: 'Demo Company Inc.',
+        industry: 'Technology',
+        domain: email.split('@')[1] || 'demo.com',
+        subscription: {
+          plan: SubscriptionPlan.PRO,
+          status: 'Trialing',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          trialStartDate: new Date(),
+          trialEndDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days left
+          seatsTotal: 5,
+          seatsUsed: 1
+        },
+        users: [user],
+        transactions: [],
+        usage: {
+          connectedOrgs: 1,
+          metadataItemsAnalyzed: 450,
+          documentsGenerated: 5,
+          storageUsedMB: 12,
+          apiCallsThisMonth: 120
+        }
+      };
+  }
 
   return { user, profile, token: 'mock-jwt-token' };
 };

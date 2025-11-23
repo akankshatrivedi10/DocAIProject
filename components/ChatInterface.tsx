@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, FileCode } from 'lucide-react';
 import { ChatMessage, Org } from '../types';
@@ -13,7 +14,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs }) => {
     {
       id: '1',
       role: 'model',
-      content: "Hello! I'm SalesforceDocBot. Connect an org to start asking questions about your metadata, Apex classes, or Flows.",
+      content: "Hello! I'm SalesforceDocBot. I've indexed your Objects, Apex, Flows, and Validation Rules. Ask me anything about your org configuration!",
       timestamp: new Date()
     }
   ]);
@@ -102,7 +103,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs }) => {
               </div>
               <div className="bg-slate-100 p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
                 <Loader2 size={16} className="animate-spin text-slate-400" />
-                <span className="text-xs text-slate-500">Analyzing metadata...</span>
+                <span className="text-xs text-slate-500">Analyzing metadata index...</span>
               </div>
             </div>
           </div>
@@ -117,7 +118,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask about your org (e.g., 'Show me the Opportunity trigger logic')"
+            placeholder="Ask e.g., 'List validation rules on Opportunity' or 'How does the Onboarding flow work?'"
             className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-slate-700"
             disabled={!activeOrg || isTyping}
           />

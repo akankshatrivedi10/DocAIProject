@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { AuthView } from '../types';
 import { login, signup } from '../services/authService';
-import { Loader2, ArrowLeft, Mail, Lock, Building, User } from 'lucide-react';
+import { TEST_CREDENTIALS } from '../services/testCredentials';
+import { Loader2, ArrowLeft, Mail, Lock, Building, User, KeyRound } from 'lucide-react';
 
 interface AuthPageProps {
   view: 'LOGIN' | 'SIGNUP';
@@ -46,6 +47,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ view, setView, onAuthSuccess }) => 
     } finally {
       setLoading(false);
     }
+  };
+
+  const fillTestUser = () => {
+      setEmail(TEST_CREDENTIALS.app.email);
+      setPassword(TEST_CREDENTIALS.app.password);
   };
 
   return (
@@ -172,6 +178,18 @@ const AuthPage: React.FC<AuthPageProps> = ({ view, setView, onAuthSuccess }) => 
                 {view === 'LOGIN' ? 'Sign In' : 'Create Account'}
               </button>
             </form>
+
+            {view === 'LOGIN' && (
+               <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+                  <button 
+                     type="button" 
+                     onClick={fillTestUser}
+                     className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center justify-center gap-1 mx-auto bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 hover:border-emerald-200 transition-colors"
+                  >
+                     <KeyRound size={12} /> Auto-fill Test User (Brahmcloud)
+                  </button>
+               </div>
+            )}
           </div>
           
           <div className="bg-slate-50 p-4 text-center border-t border-slate-100">

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Wand2, Download, Share2 } from 'lucide-react';
 import { Org } from '../types';
@@ -15,6 +16,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ activeOrg }) => {
   const handleGenerate = async () => {
     if (!activeOrg) return;
     setLoading(true);
+    // Passing the full metadata summary to the service
     const syntax = await generateDiagramSyntax(prompt, activeOrg.metadataSummary);
     setDiagramCode(syntax);
     setLoading(false);

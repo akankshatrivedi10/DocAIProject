@@ -10,7 +10,7 @@ import OAuthModal from './components/OAuthModal';
 import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User } from './types';
 import { performStagedSync } from './services/mockSalesforceService';
 import { generateRoleBasedDoc } from './services/geminiService';
-import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play } from 'lucide-react';
+import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play, Component, ShieldCheck } from 'lucide-react';
 
 const App: React.FC = () => {
   // Navigation State
@@ -149,7 +149,7 @@ const App: React.FC = () => {
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 z-0"></div>
           <h3 className="text-slate-500 text-sm font-medium mb-1 relative z-10">Total Metadata Items</h3>
           <div className="text-3xl font-bold text-slate-800 relative z-10">
-            {orgs.reduce((acc, org) => acc + (org.metadataSummary ? (org.metadataSummary.apexClasses.length + org.metadataSummary.flows.length) : 0), 0)}
+            {orgs.reduce((acc, org) => acc + (org.metadataSummary ? (org.metadataSummary.objects.length + org.metadataSummary.apexClasses.length + org.metadataSummary.flows.length) : 0), 0)}
           </div>
         </div>
         <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
@@ -286,11 +286,12 @@ const App: React.FC = () => {
              <div className="flex-1 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400">Select a connected org</div>
         ) : (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex gap-4 text-sm font-medium text-slate-600 overflow-x-auto">
-                   <div className="px-3 py-1 bg-white rounded border shadow-sm text-blue-600">Objects ({activeOrg.metadataSummary?.objects.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer">Apex Classes ({activeOrg.metadataSummary?.apexClasses.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer">Flows ({activeOrg.metadataSummary?.flows.length})</div>
-                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer">Validation Rules ({activeOrg.metadataSummary?.validationRules.length})</div>
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex gap-4 text-sm font-medium text-slate-600 overflow-x-auto whitespace-nowrap">
+                   <div className="px-3 py-1 bg-white rounded border shadow-sm text-blue-600 flex items-center gap-2"><Database size={14}/> Objects ({activeOrg.metadataSummary?.objects.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Code2 size={14}/> Apex ({activeOrg.metadataSummary?.apexClasses.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Workflow size={14}/> Flows ({activeOrg.metadataSummary?.flows.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><ShieldCheck size={14}/> Validations ({activeOrg.metadataSummary?.validationRules.length})</div>
+                   <div className="px-3 py-1 rounded hover:bg-slate-200 cursor-pointer flex items-center gap-2"><Component size={14}/> Components ({activeOrg.metadataSummary?.components.length})</div>
                 </div>
                 <div className="p-0 overflow-y-auto flex-1 bg-slate-50/30">
                    {/* Simple list view for objects */}
@@ -299,16 +300,21 @@ const App: React.FC = () => {
                            <tr>
                                <th className="p-4">Name</th>
                                <th className="p-4">Type</th>
-                               <th className="p-4">Field Count</th>
+                               <th className="p-4">Record Types</th>
+                               <th className="p-4">Fields</th>
                                <th className="p-4">Action</th>
                            </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100">
                            {activeOrg.metadataSummary?.objects.map((obj: any, i: number) => (
                                <tr key={i} className="hover:bg-white">
-                                   <td className="p-4 font-medium text-slate-700">{obj.label} <span className="text-xs text-slate-400 ml-1 font-mono">({obj.name})</span></td>
+                                   <td className="p-4 font-medium text-slate-700">
+                                       {obj.label} 
+                                       <span className="block text-xs text-slate-400 font-mono mt-0.5">{obj.name}</span>
+                                   </td>
                                    <td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${obj.type === 'Standard' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{obj.type}</span></td>
-                                   <td className="p-4 text-slate-500">{obj.fields.length}</td>
+                                   <td className="p-4 text-slate-500">{obj.recordTypes?.length || 0}</td>
+                                   <td className="p-4 text-slate-500">{obj.fields?.length || 0}</td>
                                    <td className="p-4"><button className="text-blue-600 hover:underline">View JSON</button></td>
                                </tr>
                            ))}
@@ -350,15 +356,28 @@ const App: React.FC = () => {
                 <div className="space-y-6 overflow-y-auto pr-2">
                    {/* Role specific content cards */}
                    {role === 'DEV' && activeOrg?.metadataSummary && (
-                       <div className="bg-white p-4 rounded-xl border border-slate-200">
-                           <h3 className="font-semibold mb-3 flex items-center gap-2"><Code2 size={16}/> Code Insights</h3>
-                           <div className="space-y-2">
-                               {activeOrg.metadataSummary.apexClasses.slice(0, 3).map((c: any, i: number) => (
-                                   <div key={i} className="p-3 bg-slate-50 rounded border border-slate-100 text-sm">
-                                       <div className="font-mono text-blue-700 font-medium">{c.name}</div>
-                                       <div className="text-slate-500 text-xs mt-1">{c.description}</div>
-                                   </div>
-                               ))}
+                       <div className="space-y-4">
+                           <div className="bg-white p-4 rounded-xl border border-slate-200">
+                               <h3 className="font-semibold mb-3 flex items-center gap-2"><Code2 size={16}/> Apex Triggers</h3>
+                               <div className="space-y-2">
+                                   {activeOrg.metadataSummary.triggers.map((t: any, i: number) => (
+                                       <div key={i} className="p-3 bg-slate-50 rounded border border-slate-100 text-sm">
+                                           <div className="font-mono text-blue-700 font-medium">{t.name}</div>
+                                           <div className="text-slate-500 text-xs mt-1">on {t.object} ({t.events.join(', ')})</div>
+                                       </div>
+                                   ))}
+                               </div>
+                           </div>
+                           <div className="bg-white p-4 rounded-xl border border-slate-200">
+                               <h3 className="font-semibold mb-3 flex items-center gap-2"><Component size={16}/> LWC & Aura</h3>
+                               <div className="space-y-2">
+                                   {activeOrg.metadataSummary.components.map((c: any, i: number) => (
+                                       <div key={i} className="p-3 bg-slate-50 rounded border border-slate-100 text-sm">
+                                           <div className="font-mono text-purple-700 font-medium">{c.name}</div>
+                                           <div className="text-slate-500 text-xs mt-1">{c.type} • v{c.apiVersion}</div>
+                                       </div>
+                                   ))}
+                               </div>
                            </div>
                        </div>
                    )}
@@ -374,11 +393,11 @@ const App: React.FC = () => {
                            <div className="space-y-2">
                                <div className="flex items-center gap-2 text-sm text-slate-600">
                                    <CheckCircle size={14} className="text-green-500" />
-                                   Lead Validation Rules Analyzed
+                                   Lead Validation Rules Analyzed ({activeOrg?.metadataSummary?.validationRules.length || 0})
                                </div>
                                <div className="flex items-center gap-2 text-sm text-slate-600">
                                    <CheckCircle size={14} className="text-green-500" />
-                                   Opportunity Stage Gates Mapped
+                                   Opportunity Stages: {activeOrg?.metadataSummary?.objects.find(o => o.name === 'Opportunity')?.fields.find(f => f.name === 'StageName')?.picklistValues?.join(', ')}
                                </div>
                            </div>
                        </div>
