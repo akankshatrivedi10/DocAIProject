@@ -6,8 +6,11 @@ export enum Tab {
   DEV_HUB = 'DEV_HUB',
   GTM_HUB = 'GTM_HUB',
   SALES_ENABLEMENT = 'SALES_ENABLEMENT',
-  CHAT = 'CHAT'
+  CHAT = 'CHAT',
+  PROFILE = 'PROFILE'
 }
+
+export type AuthView = 'LANDING' | 'LOGIN' | 'SIGNUP' | 'APP';
 
 export enum OrgType {
   PRODUCTION = 'Production',
@@ -82,4 +85,71 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   orgId?: string;
+}
+
+// --- Customer Profile & SaaS Models ---
+
+export enum SubscriptionPlan {
+  FREE = 'Free',
+  PRO = 'Pro',
+  ENTERPRISE = 'Enterprise'
+}
+
+export enum UserRole {
+  ADMIN = 'Admin',
+  DEV = 'Developer',
+  BA = 'Business Analyst',
+  GTM = 'GTM Lead',
+  SALES = 'Sales',
+  BDR = 'BDR'
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatarUrl?: string;
+  status: 'Active' | 'Invited' | 'Deactivated';
+  lastLogin?: Date;
+}
+
+export interface Subscription {
+  plan: SubscriptionPlan;
+  status: 'Active' | 'Past Due' | 'Canceled' | 'Trialing';
+  startDate: Date;
+  endDate: Date; // Renews on
+  trialStartDate?: Date;
+  trialEndDate?: Date;
+  seatsTotal: number;
+  seatsUsed: number;
+}
+
+export interface Transaction {
+  id: string;
+  date: Date;
+  amount: number;
+  currency: string;
+  description: string;
+  status: 'Paid' | 'Pending' | 'Failed';
+  invoiceUrl: string;
+}
+
+export interface UsageMetrics {
+  connectedOrgs: number;
+  metadataItemsAnalyzed: number;
+  documentsGenerated: number;
+  storageUsedMB: number;
+  apiCallsThisMonth: number;
+}
+
+export interface CustomerProfile {
+  id: string;
+  companyName: string;
+  industry: string;
+  domain: string;
+  subscription: Subscription;
+  users: User[];
+  transactions: Transaction[];
+  usage: UsageMetrics;
 }

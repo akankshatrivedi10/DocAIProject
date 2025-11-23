@@ -7,7 +7,8 @@ import {
   Code2, 
   Workflow, 
   GraduationCap, 
-  MessageSquareCode 
+  MessageSquareCode,
+  Settings
 } from 'lucide-react';
 import { Tab } from '../types';
 
@@ -56,6 +57,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             </button>
           );
         })}
+
+        <div className="pt-4 mt-4 border-t border-slate-800">
+          <button
+            onClick={() => setActiveTab(Tab.PROFILE)}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+              activeTab === Tab.PROFILE 
+                ? 'bg-slate-800 text-white' 
+                : 'hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Settings size={18} />
+            Settings & Billing
+          </button>
+        </div>
       </nav>
 
       <div className="p-4 border-t border-slate-800">

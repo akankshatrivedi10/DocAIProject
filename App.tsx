@@ -1,15 +1,25 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import Visualizer from './components/Visualizer';
-import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState } from './types';
+import CustomerProfilePage from './components/CustomerProfile';
+import LandingPage from './components/LandingPage';
+import AuthPage from './components/AuthPages';
+import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User } from './types';
 import { performStagedSync } from './services/mockSalesforceService';
 import { generateRoleBasedDoc } from './services/geminiService';
 import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play } from 'lucide-react';
 
 const App: React.FC = () => {
+  // Navigation State
+  const [authView, setAuthView] = useState<AuthView>('LANDING'); // Start at Landing Page
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DASHBOARD);
+  
+  // App Data State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+  
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [integrations, setIntegrations] = useState<Integration[]>([
@@ -20,6 +30,13 @@ const App: React.FC = () => {
   const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
 
   const activeOrg = orgs.find(o => o.id === activeOrgId) || null;
+
+  const handleAuthSuccess = (user: User, profile: CustomerProfile) => {
+    setCurrentUser(user);
+    setCustomerProfile(profile);
+    setAuthView('APP');
+    // If it's a new signup, maybe direct them to dashboard or profile? Defaulting to Dashboard.
+  };
 
   const handleAddOrg = async (type: OrgType) => {
     const newOrgId = Date.now().toString();
@@ -68,6 +85,18 @@ const App: React.FC = () => {
         }
         return o;
       }));
+      
+      // Update local profile stats (mock update)
+      if (customerProfile) {
+          setCustomerProfile({
+              ...customerProfile,
+              usage: {
+                  ...customerProfile.usage,
+                  connectedOrgs: customerProfile.usage.connectedOrgs + 1,
+                  metadataItemsAnalyzed: customerProfile.usage.metadataItemsAnalyzed + (metadata.objects.length * 5)
+              }
+          })
+      }
 
     } catch (e) {
       console.error("Sync failed", e);
@@ -80,6 +109,17 @@ const App: React.FC = () => {
     const content = await generateRoleBasedDoc(role, activeOrg.metadataSummary);
     setDocContent(content);
     setIsGeneratingDoc(false);
+    
+    // Mock usage update
+    if (customerProfile) {
+         setCustomerProfile({
+              ...customerProfile,
+              usage: {
+                  ...customerProfile.usage,
+                  documentsGenerated: customerProfile.usage.documentsGenerated + 1
+              }
+          })
+    }
   };
 
   // -- RENDERERS --
@@ -356,6 +396,18 @@ const App: React.FC = () => {
     );
   };
 
+  // --- View Switching Logic ---
+  
+  if (authView === 'LANDING') {
+      return <LandingPage setView={setAuthView} />;
+  }
+
+  if (authView === 'LOGIN' || authView === 'SIGNUP') {
+      return <AuthPage view={authView} setView={setAuthView} onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // --- Main App Logic ---
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -363,11 +415,23 @@ const App: React.FC = () => {
       <main className="flex-1 p-8 h-screen overflow-y-auto relative">
         {/* Global Context Bar */}
         <div className="flex justify-end items-center gap-4 mb-4">
+           {customerProfile && customerProfile.subscription.status === 'Trialing' && activeTab !== Tab.PROFILE && (
+             <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab(Tab.PROFILE)}>
+                Trial Active: {Math.ceil((new Date(customerProfile.subscription.trialEndDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days Left
+             </div>
+           )}
            {activeOrg && (
              <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded-full border shadow-sm">
                 <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : 'bg-amber-500'}`}></div>
                 Current Context: <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
              </div>
+           )}
+           {currentUser && (
+               <div className="flex items-center gap-2">
+                   <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">
+                       {currentUser.name.split(' ').map((n: string) => n[0]).join('')}
+                   </div>
+               </div>
            )}
         </div>
 
@@ -378,6 +442,7 @@ const App: React.FC = () => {
         {activeTab === Tab.GTM_HUB && renderWorkspace('BA & GTM Hub', 'GTM', Workflow)}
         {activeTab === Tab.SALES_ENABLEMENT && renderWorkspace('Sales Onboarding', 'SALES', GraduationCap)}
         {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} />}
+        {activeTab === Tab.PROFILE && customerProfile && <CustomerProfilePage profile={customerProfile} />}
       </main>
       
       {/* Syncing Overlay Toast */}
