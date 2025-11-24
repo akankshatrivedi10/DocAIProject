@@ -1,315 +1,180 @@
-
-import React, { useState, useEffect } from 'react';
-import { Loader2, Check, Lock, Cloud, KeyRound, ChevronDown, ChevronUp, Settings, Globe } from 'lucide-react';
+import React, { useState } from 'react';
+import { Cloud, Lock, ShieldCheck, ExternalLink } from 'lucide-react';
 import { OrgType } from '../types';
-import { TEST_CREDENTIALS } from '../services/testCredentials';
 
 interface OAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (credentials: { username: string; password?: string; securityToken?: string; consumerKey?: string; consumerSecret?: string; loginUrl: string }) => void;
+  onSuccess: () => void; // Not used directly, but kept for interface compatibility
   orgType: OrgType;
 }
 
-const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, onSuccess, orgType }) => {
-  const [step, setStep] = useState<'LOGIN' | 'CONSENT'>('LOGIN');
-  const [loading, setLoading] = useState(false);
-  
-  // Login State
+const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => {
   const [selectedOrgType, setSelectedOrgType] = useState<OrgType>(orgType);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [securityToken, setSecurityToken] = useState('');
-  
-  // Advanced Settings
+  const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showCustomDomain, setShowCustomDomain] = useState(true);
+  const [customDomain, setCustomDomain] = useState('softwareag--devcpq.sandbox.my.salesforce.com');
   const [consumerKey, setConsumerKey] = useState('');
   const [consumerSecret, setConsumerSecret] = useState('');
 
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedOrgType(orgType);
-      // If we have credentials in the test file, auto-populate them
-      if (TEST_CREDENTIALS.salesforce.username) {
-          fillTestCredentials();
-      }
-    }
-  }, [isOpen, orgType]);
-
-  const fillTestCredentials = () => {
-    const creds = TEST_CREDENTIALS.salesforce;
-    setUsername(creds.username);
-    setPassword(creds.password);
-    setSecurityToken(creds.securityToken || '');
-    setConsumerKey(creds.consumerKey || '');
-    setConsumerSecret(creds.consumerSecret || '');
-    
-    // Auto-detect sandbox from username suffix
-    // Checks for .devcpq (user specific), .dev, .test, .sandbox, .cs
-    if (creds.username.match(/(\.dev|\.test|\.sandbox|\.cs|\.devcpq)/i)) {
-        setSelectedOrgType(OrgType.SANDBOX);
-    } else {
-        setSelectedOrgType(OrgType.PRODUCTION);
-    }
-  };
-
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!username || !password) return;
+  const handleOAuthRedirect = () => {
     setLoading(true);
-    // Simulate auth check latency
-    setTimeout(() => {
-      setLoading(false);
-      setStep('CONSENT');
-    }, 1200);
-  };
 
-  const handleAllow = () => {
-    setLoading(true);
-    // Simulate token exchange latency
-    setTimeout(() => {
-      setLoading(false);
-      // Determine correct Login URL based on selection
-      const loginUrl = selectedOrgType === OrgType.SANDBOX 
-        ? 'https://test.salesforce.com' 
-        : 'https://login.salesforce.com';
+    // Use user-provided key or fallback to default (only for demo purposes)
+    const finalClientId = consumerKey || '3MVG9zOb8H6wKLFB7zmZNpygP_lAVkRdqdrTzhSbY5eIg0WC1OIjHWegTNJ3qpjPxTPyrMMo9Av0R4mS8OQ5R';
+    const finalClientSecret = consumerSecret || '908DF7011CBED34A72303BB95A30A009E4AB9BF26A889D16460CECD0D720C101';
 
-      // Pass full credentials back
-      onSuccess({
-        username,
-        password,
-        securityToken,
-        consumerKey,
-        consumerSecret,
-        loginUrl
-      });
-      // Reset state
-      setStep('LOGIN');
-      setUsername('');
-      setPassword('');
-      setSecurityToken('');
-      setConsumerKey('');
-      setConsumerSecret('');
-      setShowAdvanced(false);
-    }, 1500);
+    // Store in session storage for the callback to use
+    sessionStorage.setItem('sf_consumer_key', finalClientId);
+    sessionStorage.setItem('sf_consumer_secret', finalClientSecret);
+
+    const redirectUri = `${window.location.origin}/oauth/callback`;
+
+    let loginUrl = selectedOrgType === OrgType.SANDBOX
+      ? 'https://test.salesforce.com'
+      : 'https://login.salesforce.com';
+
+    if (showCustomDomain && customDomain) {
+      // Ensure protocol is present
+      loginUrl = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
+    }
+
+    const authUrl = `${loginUrl}/services/oauth2/authorize?response_type=code&client_id=${finalClientId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    // Redirect to Salesforce
+    window.location.href = authUrl;
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      {step === 'LOGIN' ? (
-        <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-          <div className="p-8 pb-4 overflow-y-auto">
-             <div className="flex justify-center mb-6">
-               <div className="flex items-center gap-2">
-                 <Cloud className="text-blue-500 fill-blue-500" size={48} />
-                 <span className="text-2xl font-bold text-slate-700">salesforce</span>
-               </div>
-             </div>
-
-             {/* Environment Switcher */}
-             <div className="flex justify-center mb-6">
-                 <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-medium w-full">
-                     <button 
-                        type="button"
-                        onClick={() => setSelectedOrgType(OrgType.PRODUCTION)}
-                        className={`flex-1 px-3 py-1.5 rounded-md transition-all ${selectedOrgType === OrgType.PRODUCTION ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
-                     >
-                         Production
-                     </button>
-                     <button 
-                        type="button"
-                        onClick={() => setSelectedOrgType(OrgType.SANDBOX)}
-                        className={`flex-1 px-3 py-1.5 rounded-md transition-all ${selectedOrgType === OrgType.SANDBOX ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
-                     >
-                         Sandbox
-                     </button>
-                 </div>
-             </div>
-             
-             {/* Login URL Indicator */}
-             <div className="text-center mb-4">
-                 <p className="text-[10px] text-slate-400 font-mono">
-                     Target: {selectedOrgType === OrgType.SANDBOX ? 'test.salesforce.com' : 'login.salesforce.com'}
-                 </p>
-             </div>
-
-             <h2 className="text-center text-lg font-medium text-slate-700 mb-6">
-                Log In to {selectedOrgType}
-             </h2>
-
-             <form onSubmit={handleLogin} className="space-y-4">
-               <div>
-                 <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Username</label>
-                 <input 
-                   type="text" 
-                   value={username}
-                   onChange={(e) => setUsername(e.target.value)}
-                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
-                   placeholder="user@company.com.sandbox"
-                 />
-               </div>
-               <div>
-                 <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Password</label>
-                 <input 
-                   type="password" 
-                   value={password}
-                   onChange={(e) => setPassword(e.target.value)}
-                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
-                   placeholder="••••••••"
-                 />
-               </div>
-               
-               {/* Security Token - Always Visible */}
-               <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1 flex items-center justify-between">
-                       Security Token
-                       <a href="https://help.salesforce.com/s/articleView?id=sf.user_security_token.htm&type=5" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline text-[10px] font-normal">What is this?</a>
-                    </label>
-                    <input 
-                      type="text" 
-                      value={securityToken}
-                      onChange={(e) => setSecurityToken(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                      placeholder="Ex: uK8x... (Required if outside network)"
-                    />
-               </div>
-
-               {/* Advanced Settings Toggle */}
-               <div className="pt-2">
-                 <button 
-                    type="button" 
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium"
-                 >
-                    {showAdvanced ? <ChevronUp size={14} /> : <Settings size={14} />}
-                    {showAdvanced ? 'Hide Connected App Settings' : 'Show Connected App Settings (OAuth)'}
-                 </button>
-               </div>
-
-               {/* Advanced Fields */}
-               {showAdvanced && (
-                 <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in slide-in-from-top-2">
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key (Client ID)</label>
-                        <input 
-                          type="text" 
-                          value={consumerKey}
-                          onChange={(e) => setConsumerKey(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                          placeholder="3MVG9..."
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Secret (Client Secret)</label>
-                        <input 
-                          type="password" 
-                          value={consumerSecret}
-                          onChange={(e) => setConsumerSecret(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                          placeholder="908D..."
-                        />
-                    </div>
-                 </div>
-               )}
-               
-               <button 
-                 type="submit" 
-                 disabled={loading || !username || !password}
-                 className="w-full bg-[#00A1E0] hover:bg-[#008CC2] text-white font-semibold py-3 rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
-               >
-                 {loading ? <Loader2 size={20} className="animate-spin" /> : 'Log In'}
-               </button>
-             </form>
-             
-             <div className="mt-4 flex items-center justify-between text-xs">
-                <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                   <input type="checkbox" className="rounded text-blue-500 focus:ring-blue-500"/>
-                   Remember me
-                </label>
-                <a href="#" className="text-blue-500 hover:underline">Forgot Password?</a>
-             </div>
-             
-             <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-                 <button 
-                    type="button" 
-                    onClick={fillTestCredentials}
-                    className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center justify-center gap-1 mx-auto bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 hover:border-emerald-200 transition-colors"
-                 >
-                    <KeyRound size={12} /> Re-fill Test Credentials
-                 </button>
-             </div>
+      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
+        <div className="p-8 pb-6">
+          <div className="flex justify-center mb-6">
+            <div className="flex items-center gap-2">
+              <Cloud className="text-blue-500 fill-blue-500" size={48} />
+              <span className="text-2xl font-bold text-slate-700">salesforce</span>
+            </div>
           </div>
-          <div className="bg-slate-50 px-8 py-4 text-center border-t border-slate-100 relative">
-             <button onClick={onClose} className="absolute left-4 top-4 text-slate-400 hover:text-slate-600 text-xs">Cancel</button>
-             <p className="text-xs text-slate-500">Not a customer? <a href="#" className="text-blue-500 hover:underline">Try for Free</a></p>
+
+          <h2 className="text-center text-lg font-medium text-slate-700 mb-2">
+            Connect to Salesforce
+          </h2>
+          <p className="text-center text-slate-500 text-sm mb-6">
+            You will be redirected to Salesforce to log in and authorize access.
+          </p>
+
+          {/* Environment Switcher */}
+          <div className="flex justify-center mb-4">
+            <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-medium w-full">
+              <button
+                type="button"
+                onClick={() => setSelectedOrgType(OrgType.PRODUCTION)}
+                className={`flex-1 px-3 py-2 rounded-md transition-all ${selectedOrgType === OrgType.PRODUCTION ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Production
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedOrgType(OrgType.SANDBOX)}
+                className={`flex-1 px-3 py-2 rounded-md transition-all ${selectedOrgType === OrgType.SANDBOX ? 'bg-white text-slate-800 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Sandbox
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="bg-[#00A1E0] p-6 text-white flex items-center gap-4">
-                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                    <Cloud size={28} className="text-white fill-white" />
-                 </div>
-                 <div>
-                    <h2 className="text-xl font-bold">Allow Access?</h2>
-                    <p className="text-blue-100 text-sm">DocBot is requesting permission to access your Salesforce org.</p>
-                 </div>
-            </div>
-            
-            <div className="p-8">
-               <div className="flex items-center gap-3 mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md">SD</div>
-                  <div className="flex-1">
-                     <div className="font-semibold text-slate-800">DocBot - AI Architect</div>
-                     <div className="text-xs text-slate-500">connected app via docbot.ai</div>
-                  </div>
-               </div>
 
-               <h3 className="font-semibold text-slate-700 mb-4">Access Requested:</h3>
-               <ul className="space-y-4 mb-8">
-                  <li className="flex items-start gap-3 text-sm text-slate-600">
-                     <Check className="text-green-500 shrink-0 mt-0.5" size={16} />
-                     <span>Access your basic profile information</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm text-slate-600">
-                     <Check className="text-green-500 shrink-0 mt-0.5" size={16} />
-                     <span>Access and manage your data (API)</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm text-slate-600">
-                     <Check className="text-green-500 shrink-0 mt-0.5" size={16} />
-                     <span>Perform requests on your behalf at any time (refresh_token, offline_access)</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm text-slate-600">
-                     <Check className="text-green-500 shrink-0 mt-0.5" size={16} />
-                     <span>Manage metadata (Tooling API)</span>
-                  </li>
-               </ul>
+          {/* Custom Domain Input */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                id="useCustomDomain"
+                checked={showCustomDomain}
+                onChange={(e) => setShowCustomDomain(e.target.checked)}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="useCustomDomain" className="text-xs text-slate-600">Use Custom Domain (My Domain)</label>
+            </div>
 
-               <div className="flex gap-4">
-                  <button 
-                    onClick={onClose}
-                    className="flex-1 py-3 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    Deny
-                  </button>
-                  <button 
-                    onClick={handleAllow}
-                    disabled={loading}
-                    className="flex-1 py-3 bg-[#00A1E0] hover:bg-[#008CC2] text-white font-semibold rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2"
-                  >
-                    {loading ? <Loader2 size={20} className="animate-spin" /> : 'Allow'}
-                  </button>
-               </div>
+            {showCustomDomain && (
+              <div className="animate-in slide-in-from-top-2">
+                <input
+                  type="text"
+                  value={customDomain}
+                  onChange={(e) => setCustomDomain(e.target.value)}
+                  placeholder="e.g. mycompany--sandbox.my.salesforce.com"
+                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Enter the full domain without https://</p>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleOAuthRedirect}
+            disabled={loading}
+            className="w-full bg-[#00A1E0] hover:bg-[#008CC2] text-white font-semibold py-3 rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Redirecting...' : (
+              <>
+                <ExternalLink size={18} />
+                Log In with Salesforce
+              </>
+            )}
+          </button>
+
+          <div className="mt-6 flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <ShieldCheck className="text-blue-600 shrink-0 mt-0.5" size={16} />
+            <p className="text-xs text-blue-800">
+              We use secure OAuth 2.0. Your password is never stored on our servers.
+            </p>
+          </div>
+
+          {/* Advanced Settings Toggle */}
+          <div className="pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-slate-400 hover:text-blue-600 font-medium underline decoration-dotted"
+            >
+              {showAdvanced ? 'Hide Connected App Settings' : 'I have my own Connected App'}
+            </button>
+          </div>
+
+          {/* Advanced Fields */}
+          {showAdvanced && (
+            <div className="mt-4 space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200 text-left animate-in slide-in-from-top-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key</label>
+                <input
+                  type="text"
+                  value={consumerKey}
+                  onChange={(e) => setConsumerKey(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                  placeholder="3MVG9..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Secret</label>
+                <input
+                  type="password"
+                  value={consumerSecret}
+                  onChange={(e) => setConsumerSecret(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                  placeholder="908D..."
+                />
+              </div>
             </div>
-            <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-center gap-4 text-xs text-slate-400">
-                <span className="flex items-center gap-1"><Lock size={10} /> Secure Connection</span>
-                <span>•</span>
-                <span>Privacy Policy</span>
-            </div>
+          )}
         </div>
-      )}
+
+        <div className="bg-slate-50 px-8 py-4 text-center border-t border-slate-100 relative">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs font-medium">Cancel</button>
+        </div>
+      </div>
     </div>
   );
 };

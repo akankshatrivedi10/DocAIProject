@@ -7,9 +7,10 @@ import { generateChatResponse } from '../services/geminiService';
 interface ChatInterfaceProps {
   activeOrg: Org | null;
   orgs: Org[];
+  initialInput?: string;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs, initialInput }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -18,7 +19,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs }) => {
       timestamp: new Date()
     }
   ]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialInput || '');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -85,11 +86,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ activeOrg, orgs }) => {
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
                 {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
               </div>
-              <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === 'user' 
-                  ? 'bg-blue-600 text-white rounded-tr-none' 
+              <div className={`p-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
+                  ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-slate-100 text-slate-700 rounded-tl-none'
-              }`}>
+                }`}>
                 {msg.content}
               </div>
             </div>

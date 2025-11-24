@@ -1,5 +1,0 @@
-{
-  "name": "SalesforceDocBot",
-  "description": "An agentic assistant for Salesforce metadata analysis, documentation generation, and process visualization powered by Gemini 2.5.",
-  "requestFramePermissions": []
-}

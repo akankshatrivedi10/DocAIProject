@@ -56,6 +56,14 @@ export interface Org {
   alias: string;
   type: OrgType;
   status: ConnectionStatus;
+  // OAuth Fields
+  accessToken?: string;
+  refreshToken?: string;
+  instanceUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+
+  // Legacy fields (keeping for now to avoid breaking other parts immediately, but should be deprecated)
   consumerKey?: string;
   consumerSecret?: string;
   securityToken?: string;
