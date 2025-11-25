@@ -24,14 +24,14 @@ When answering:
 `;
 
 export const generateChatResponse = async (
-  history: ChatMessage[], 
-  currentMessage: string, 
+  history: ChatMessage[],
+  currentMessage: string,
   metadataContext: MetadataSummary | undefined
 ): Promise<string> => {
   const client = getClient();
   if (!client) return "Error: API Key missing. Please configure process.env.API_KEY.";
 
-  const contextString = metadataContext 
+  const contextString = metadataContext
     ? `CURRENT ORG METADATA CONTEXT: ${JSON.stringify(metadataContext.details)}`
     : "NO METADATA CONTEXT AVAILABLE.";
 
@@ -50,7 +50,7 @@ export const generateChatResponse = async (
         temperature: 0.2,
       }
     });
-    
+
     return response.text || "I couldn't generate a response.";
   } catch (error) {
     console.error("Gemini API Error:", error);
@@ -62,7 +62,7 @@ export const generateDiagramSyntax = async (description: string, metadataContext
   const client = getClient();
   if (!client) return "";
 
-  const contextString = metadataContext 
+  const contextString = metadataContext
     ? `Context: ${JSON.stringify(metadataContext.details)}`
     : "";
 
@@ -71,6 +71,7 @@ export const generateDiagramSyntax = async (description: string, metadataContext
   
   Task: Create a Mermaid.js diagram for: "${description}".
   Type: Sequence Diagram, Flowchart, or ER Diagram (choose best fit).
+  Context Usage: Use provided metadata (Flows, Validation Rules, Apex, Objects) to accurately model the process steps and logic.
   Rule: Return ONLY the raw Mermaid code string. Do not include \`\`\`mermaid or markdown blocks.
   `;
 
@@ -86,35 +87,132 @@ export const generateDiagramSyntax = async (description: string, metadataContext
   }
 };
 
-export const generateRoleBasedDoc = async (role: 'DEV' | 'GTM' | 'SALES', metadataContext: MetadataSummary): Promise<string> => {
-    const client = getClient();
-    if (!client) return "";
-  
-    let rolePrompt = "";
-    if (role === 'DEV') {
-        rolePrompt = "Task: Generate a Technical Specification including Apex architecture, Trigger patterns, and API dependencies. Focus on robustness and scalability. Include a Code Reference section.";
-    } else if (role === 'GTM') {
-        rolePrompt = "Task: Generate a Functional Process Guide. Focus on key user journeys (Lead to Cash, Support Resolution). Map Flows to business steps. Identify automation touchpoints.";
-    } else if (role === 'SALES') {
-        rolePrompt = "Task: Generate a Sales Onboarding & Enablement Guide. Explain how to enter data correctly, what Fields are mandatory (Validation Rules), and what happens after they close a deal (Automation). Tone should be simple and instructional.";
-    }
+export const generateRoleBasedDoc = async (role: 'DEV' | 'GTM' | 'SALES', specificRole: string | undefined, processName: string | undefined, metadataContext: MetadataSummary): Promise<string> => {
+  const client = getClient();
+  if (!client) return "";
 
-    const prompt = `
+  const DOCBOT_PROMPT = `
+    You are DocBot – GTM Process Intelligence Agent.
+    Your responsibility is to generate accurate, role-based GTM process documentation and visualizations, using:
+    
+    1. The selected GTM Role (e.g., BDR, BDM, Salesperson, Sales Manager, Account Manager, Customer Success, Partner Enablement)
+    2. The selected Business Process (e.g., Lead Qualification, Opportunity Management, Forecasting, Onboarding, Renewal, Partner Registration, etc.)
+    3. The actual CRM metadata retrieved from Salesforce or other connected systems.
+    
+    🔍 Your Job
+    
+    When the user selects a role and a process in the GTM Workspace:
+    
+    1. Understand the Role
+    Interpret the selected GTM role and its expected responsibilities in a typical revenue organization.
+    
+    2. Interpret the Selected Process
+    Identify what the business process means (e.g., Lead Qualification, Deal Progression, Forecasting, Renewal, Escalation, Partner Deal Registration, etc.).
+    
+    3. Combine with CRM Metadata
+    Use the synced metadata to tailor the process:
+    - Flows
+    - Objects & Fields
+    - Validation Rules
+    - Triggers
+    - Page Layouts
+    - Record Types
+    - Approval Processes
+    - Assignment Rules
+    - Routing & Scoring
+    - Lifecycle Stages
+    - Opportunity Paths
+    - Partner processes
+
+    If specific process metadata is insufficient or missing, you MUST analyze and retrieve details from:
+    - Related Flows (Screen Flows, Autolaunched Flows, Triggered Flows)
+    - Validation Rules (to understand constraints and logic)
+    - Apex Classes & Triggers (for backend automation logic)
+    - Object Definitions (Fields, Record Types, Relationships)
+    - Lead Assignment Rules (if available in context)
+    - Any other relevant metadata that contributes to the process logic.
+    
+    4. Produce Three Structured Outputs
+    
+    Your output must include:
+    
+    A. Human-Readable Process Description
+    Explain:
+    - What this process means for the chosen role
+    - How the CRM supports it
+    - What key steps they perform
+    - Which automation runs behind the scenes
+    
+    B. Visual Diagram (Mermaid)
+    Produce the most appropriate visual based on context:
+    - Flowchart for step-by-step processes
+    - Swimlane for multi-team processes
+    - Sequence diagram for interactions
+    - ERD when objects and relationships matter
+    
+    Always return valid Mermaid code blocks.
+    
+    C. JSON Output for Application Rendering
+    
+    Example structure:
+    {
+      "role": "BDR",
+      "process": "Lead Qualification",
+      "steps": [
+        "Inbound lead captured",
+        "Lead Routing via Flow: Lead_Assignment_Flow",
+        "BDR performs qualification",
+        "BDR updates fields",
+        "Convert or recycle lead"
+      ],
+      "crm_metadata_referenced": [
+        "Lead object",
+        "Fields: Status, Rating, Source",
+        "Flow: Lead_Assignment_Flow",
+        "Validation Rule: VR_Lead_Qualification"
+      ],
+      "visualization": {
+        "type": "mermaid",
+        "diagram": "..."
+      }
+    }
+    
+    🧠 If Metadata is Missing
+    Ask the backend:
+    “Additional metadata required: please sync flows, opportunity stage paths, assignment rules, or validation rules.”
+    
+    ⚙️ Rules You Must Follow
+    - Always customize outputs with the metadata provided.
+    - Never make assumptions when metadata is missing—ask for it.
+    - Always provide all three outputs (Description + Diagram + JSON).
+    - Use terminology consistent with CRM configuration.
+    `;
+
+  let rolePrompt = "";
+  if (role === 'DEV') {
+    rolePrompt = "Task: Generate a Technical Specification including Apex architecture, Trigger patterns, and API dependencies. Focus on robustness and scalability. Include a Code Reference section.";
+  } else if (role === 'GTM' || role === 'SALES') {
+    const specificRoleText = specificRole ? `Selected Role: ${specificRole}` : "Role: General GTM/Sales";
+    const processText = processName ? `Selected Process: ${processName}` : "Process: General Overview";
+    rolePrompt = `${DOCBOT_PROMPT}\n\n${specificRoleText}\n${processText}\n\nFocus specifically on these selections using the provided metadata.`;
+  }
+
+  const prompt = `
     Metadata: ${JSON.stringify(metadataContext.details)}
     
     ${rolePrompt}
     
-    Format: Markdown.
+    Format: Markdown. Ensure Mermaid diagrams are wrapped in \`\`\`mermaid blocks.
     `;
-  
-    try {
-      const response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-      return response.text || "";
-    } catch (error) {
-      console.error("Gemini Doc Error:", error);
-      return "Error generating documentation.";
-    }
+
+  try {
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+    return response.text || "";
+  } catch (error) {
+    console.error("Gemini Doc Error:", error);
+    return "Error generating documentation.";
+  }
 };

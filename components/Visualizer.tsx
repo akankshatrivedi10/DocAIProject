@@ -6,12 +6,20 @@ import { generateDiagramSyntax } from '../services/geminiService';
 
 interface VisualizerProps {
   activeOrg: Org | null;
+  role?: string;
+  process?: string;
 }
 
-const Visualizer: React.FC<VisualizerProps> = ({ activeOrg }) => {
+const Visualizer: React.FC<VisualizerProps> = ({ activeOrg, role, process }) => {
   const [prompt, setPrompt] = useState('');
   const [diagramCode, setDiagramCode] = useState<string>('');
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (role && process) {
+      setPrompt(`Visualize the ${process} process for the ${role} role.`);
+    }
+  }, [role, process]);
 
   const handleGenerate = async () => {
     if (!activeOrg) return;
@@ -24,7 +32,9 @@ const Visualizer: React.FC<VisualizerProps> = ({ activeOrg }) => {
 
   // Use mermaid.ink for lightweight rendering without heavy client libraries
   const getMermaidUrl = (code: string) => {
-    const encoded = Buffer.from(code).toString('base64');
+    // Strip markdown code blocks if present
+    const cleanCode = code.replace(/```mermaid/g, '').replace(/```/g, '').trim();
+    const encoded = Buffer.from(cleanCode).toString('base64');
     return `https://mermaid.ink/img/${encoded}`;
   };
 
@@ -35,7 +45,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ activeOrg }) => {
           <h2 className="text-lg font-semibold text-slate-800">Process & Data Visualizer</h2>
           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">Gemini Powered</span>
         </div>
-        
+
         <div className="flex gap-4">
           <input
             type="text"
@@ -53,9 +63,9 @@ const Visualizer: React.FC<VisualizerProps> = ({ activeOrg }) => {
             Generate
           </button>
         </div>
-        
+
         {!activeOrg && (
-           <p className="mt-2 text-sm text-red-500">Please select a connected org first.</p>
+          <p className="mt-2 text-sm text-red-500">Please select a connected org first.</p>
         )}
       </div>
 
@@ -73,15 +83,15 @@ const Visualizer: React.FC<VisualizerProps> = ({ activeOrg }) => {
             </div>
           </div>
           <div className="p-8 flex justify-center bg-white overflow-auto">
-             <img 
-               src={getMermaidUrl(diagramCode)} 
-               alt="Generated Diagram" 
-               className="max-w-full shadow-lg rounded"
-               onError={(e) => {
-                   (e.target as HTMLImageElement).style.display = 'none';
-                   alert("Failed to render diagram. Syntax might be invalid.");
-               }}
-             />
+            <img
+              src={getMermaidUrl(diagramCode)}
+              alt="Generated Diagram"
+              className="max-w-full shadow-lg rounded"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+                alert("Failed to render diagram. Syntax might be invalid.");
+              }}
+            />
           </div>
           <div className="p-4 bg-slate-900 text-slate-300 text-xs font-mono overflow-x-auto">
             <pre>{diagramCode}</pre>

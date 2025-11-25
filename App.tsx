@@ -19,6 +19,8 @@ import Integrations from './components/Integrations';
 import MetadataExplorer from './components/MetadataExplorer';
 import DevWorkspace from './components/DevWorkspace';
 import GTMWorkspace from './components/GTMWorkspace';
+import Settings from './components/Settings';
+import UserHeader from './components/UserHeader';
 
 const App: React.FC = () => {
   // Navigation State
@@ -111,6 +113,15 @@ const App: React.FC = () => {
         setIsOAuthOpen(true);
       }, 500);
     }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setCustomerProfile(null);
+    localStorage.removeItem('docai_user');
+    localStorage.removeItem('docai_profile');
+    setAuthView('LANDING');
+    setActiveTab(Tab.DASHBOARD);
   };
 
   const initiateAddOrg = (type: OrgType) => {
@@ -246,10 +257,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerateRoleDoc = async (role: 'DEV' | 'GTM' | 'SALES') => {
-    if (!activeOrg || !activeOrg.metadataSummary) return;
+  const handleGenerateDoc = async (role: 'DEV' | 'GTM' | 'SALES' = 'DEV', specificRole?: string, processName?: string) => {
+    if (!activeOrg?.metadataSummary) return;
     setIsGeneratingDoc(true);
-    const content = await generateRoleBasedDoc(role, activeOrg.metadataSummary);
+    const content = await generateRoleBasedDoc(role, specificRole, processName, activeOrg.metadataSummary);
     setDocContent(content);
     setIsGeneratingDoc(false);
 
@@ -261,7 +272,7 @@ const App: React.FC = () => {
           ...customerProfile.usage,
           documentsGenerated: customerProfile.usage.documentsGenerated + 1
         }
-      })
+      });
     }
   };
 
@@ -292,39 +303,44 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
 
-      <main className="flex-1 p-8 h-screen overflow-y-auto relative">
-        {/* Global Context Bar */}
-        <div className="flex justify-end items-center gap-4 mb-4">
-          {customerProfile && customerProfile.subscription.status === 'Trialing' && activeTab !== Tab.PROFILE && (
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab(Tab.PROFILE)}>
-              Trial Active: {Math.ceil((new Date(customerProfile.subscription.trialEndDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days Left
-            </div>
-          )}
-          {activeOrg && (
-            <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded-full border shadow-sm">
-              <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : (activeOrg.status === ConnectionStatus.ERROR ? 'bg-red-500' : 'bg-amber-500')}`}></div>
-              Current Context: <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
-            </div>
-          )}
-          {currentUser && (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">
-                {currentUser.name.split(' ').map((n: string) => n[0]).join('')}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* User Header */}
+        {currentUser && customerProfile && (
+          <UserHeader
+            user={currentUser}
+            organizationName={customerProfile.companyName}
+            onLogout={handleLogout}
+          />
+        )}
+
+        <div className="flex-1 p-8 overflow-y-auto relative">
+          {/* Global Context Bar */}
+          <div className="flex justify-end items-center gap-4 mb-4">
+            {customerProfile && customerProfile.subscription.status === 'Trialing' && activeTab !== Tab.PROFILE && (
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab(Tab.PROFILE)}>
+                Trial Active: {Math.ceil((new Date(customerProfile.subscription.trialEndDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days Left
               </div>
-            </div>
-          )}
+            )}
+            {activeOrg && (
+              <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded-full border shadow-sm">
+                <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : (activeOrg.status === ConnectionStatus.ERROR ? 'bg-red-500' : 'bg-amber-500')}`}></div>
+                Current Context: <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {activeTab === Tab.DASHBOARD && <Dashboard orgs={orgs} />}
         {activeTab === Tab.INTEGRATIONS && <Integrations orgs={orgs} integrations={integrations} activeOrgId={activeOrgId} setActiveOrgId={setActiveOrgId} initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }} />}
         {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} />}
-        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={() => handleGenerateRoleDoc('DEV')} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
-        {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={handleGenerateRoleDoc} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
-        {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={handleGenerateRoleDoc} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={() => handleGenerateDoc('DEV')} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+        {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+        {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
         {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}
-        {activeTab === Tab.PROFILE && customerProfile && <CustomerProfilePage profile={customerProfile} />}
+        {activeTab === Tab.SETTINGS && customerProfile && currentUser && <Settings customerProfile={customerProfile} currentUser={currentUser} />}
+        {activeTab === Tab.PROFILE && customerProfile && currentUser && <CustomerProfilePage profile={customerProfile} currentUser={currentUser} />}
       </main>
 
       {/* OAuth Modal */}

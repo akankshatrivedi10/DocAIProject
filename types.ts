@@ -7,7 +7,8 @@ export enum Tab {
   GTM_HUB = 'GTM_HUB',
   SALES_ENABLEMENT = 'SALES_ENABLEMENT',
   CHAT = 'CHAT',
-  PROFILE = 'PROFILE'
+  PROFILE = 'PROFILE',
+  SETTINGS = 'SETTINGS'
 }
 
 export type AuthView = 'LANDING' | 'LOGIN' | 'SIGNUP' | 'APP';
@@ -202,6 +203,11 @@ export enum SubscriptionPlan {
   ENTERPRISE = 'Enterprise'
 }
 
+export enum SystemRole {
+  ADMIN = 'Admin',
+  USER = 'User'
+}
+
 export enum UserRole {
   ADMIN = 'Admin',
   DEV = 'Developer',
@@ -216,6 +222,8 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  systemRole: SystemRole; // Admin or User permission level
+  organizationId: string;
   avatarUrl?: string;
   status: 'Active' | 'Invited' | 'Deactivated';
   lastLogin?: Date;
@@ -250,6 +258,14 @@ export interface UsageMetrics {
   apiCallsThisMonth: number;
 }
 
+export interface UsageLimits {
+  maxConnectedOrgs: number;
+  maxMetadataItems: number;
+  maxDocuments: number;
+  maxStorageMB: number;
+  maxApiCalls: number;
+}
+
 export interface CustomerProfile {
   id: string;
   companyName: string;
@@ -259,4 +275,5 @@ export interface CustomerProfile {
   users: User[];
   transactions: Transaction[];
   usage: UsageMetrics;
+  limits: UsageLimits;
 }

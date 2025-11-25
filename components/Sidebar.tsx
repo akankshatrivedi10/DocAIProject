@@ -1,23 +1,23 @@
-
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Link, 
-  Database, 
-  Code2, 
-  Workflow, 
-  GraduationCap, 
+import {
+  LayoutDashboard,
+  Link,
+  Database,
+  Code2,
+  Workflow,
+  GraduationCap,
   MessageSquareCode,
   Settings
 } from 'lucide-react';
-import { Tab } from '../types';
+import { Tab, User, SystemRole } from '../types';
 
 interface SidebarProps {
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
+  currentUser: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser }) => {
   const navItems = [
     { id: Tab.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
     { id: Tab.INTEGRATIONS, label: 'Integrations', icon: Link },
@@ -46,11 +46,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
-                isActive 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20 translate-x-1' 
-                  : 'hover:bg-slate-800 hover:text-white'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${isActive
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20 translate-x-1'
+                : 'hover:bg-slate-800 hover:text-white'
+                }`}
             >
               <Icon size={18} />
               {item.label}
@@ -59,17 +58,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         })}
 
         <div className="pt-4 mt-4 border-t border-slate-800">
-          <button
-            onClick={() => setActiveTab(Tab.PROFILE)}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
-              activeTab === Tab.PROFILE 
-                ? 'bg-slate-800 text-white' 
+          {currentUser?.systemRole === SystemRole.ADMIN ? (
+            <button
+              onClick={() => setActiveTab(Tab.SETTINGS)}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === Tab.SETTINGS
+                ? 'bg-slate-800 text-white'
                 : 'hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Settings size={18} />
-            Settings & Billing
-          </button>
+                }`}
+            >
+              <Settings size={18} />
+              Settings & Billing
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab(Tab.PROFILE)}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === Tab.PROFILE
+                ? 'bg-slate-800 text-white'
+                : 'hover:bg-slate-800 hover:text-white'
+                }`}
+            >
+              <Settings size={18} />
+              My Profile
+            </button>
+          )}
         </div>
       </nav>
 
@@ -77,7 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         <div className="bg-slate-800/50 rounded p-3 border border-slate-700/50">
           <p className="text-xs text-slate-400 font-mono">v2.0.0 • SaaS Beta</p>
           <div className="mt-2 flex items-center gap-2">
-             <span className="relative flex h-2 w-2">
+            <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>

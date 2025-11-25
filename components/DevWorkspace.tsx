@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, RefreshCw, FileText, Code2, Component, Sparkles, BookOpen, Database, Workflow, ShieldCheck } from 'lucide-react';
+import { Bot, RefreshCw, FileText, Code2, Component, Sparkles, BookOpen, Database, Workflow, ShieldCheck, ChevronDown } from 'lucide-react';
 import { Org, Tab } from '../types';
 
 interface DevWorkspaceProps {
@@ -20,6 +20,7 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
     docContent
 }) => {
     const [selectedDevItems, setSelectedDevItems] = useState<Set<string>>(new Set());
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
     const toggleSelection = (id: string) => {
         const newSet = new Set(selectedDevItems);
@@ -29,6 +30,16 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
             newSet.add(id);
         }
         setSelectedDevItems(newSet);
+    };
+
+    const toggleSection = (section: string) => {
+        const newSet = new Set(expandedSections);
+        if (newSet.has(section)) {
+            newSet.delete(section);
+        } else {
+            newSet.add(section);
+        }
+        setExpandedSections(newSet);
     };
 
     const getSelectedNames = () => {
@@ -147,137 +158,227 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
                 <div className="space-y-6 overflow-y-auto pr-2">
                     {/* Role specific content cards */}
                     {activeOrg?.metadataSummary && (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {/* Apex Classes */}
-                            <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                <h3 className="font-semibold mb-3 flex items-center gap-2"><Code2 size={16} /> Apex Classes</h3>
-                                <div className="space-y-2">
-                                    {activeOrg.metadataSummary.apexClasses.map((a: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`apex_${a.name}`) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDevItems.has(`apex_${a.name}`)}
-                                                onChange={() => toggleSelection(`apex_${a.name}`)}
-                                                className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <div>
-                                                <div className="font-mono text-blue-700 font-medium">{a.name}</div>
-                                                <div className="text-slate-500 text-xs mt-1">v{a.apiVersion} • {a.status}</div>
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('apexClasses')}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Code2 size={16} className="text-blue-600" />
+                                        Apex Classes
+                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.apexClasses.length})</span>
+                                    </h3>
+                                    <ChevronDown
+                                        size={20}
+                                        className={`text-slate-400 transition-transform ${expandedSections.has('apexClasses') ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {expandedSections.has('apexClasses') && (
+                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
+                                        {activeOrg.metadataSummary.apexClasses.map((a: any, i: number) => (
+                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`apex_${a.name}`) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevItems.has(`apex_${a.name}`)}
+                                                    onChange={() => toggleSelection(`apex_${a.name}`)}
+                                                    className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <div>
+                                                    <div className="font-mono text-blue-700 font-medium">{a.name}</div>
+                                                    <div className="text-slate-500 text-xs mt-1">v{a.apiVersion} • {a.status}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeOrg.metadataSummary.apexClasses.length === 0 && <div className="text-slate-400 text-sm">No Apex classes found.</div>}
-                                </div>
+                                        ))}
+                                        {activeOrg.metadataSummary.apexClasses.length === 0 && <div className="text-slate-400 text-sm py-2">No Apex classes found.</div>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Apex Triggers */}
-                            <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                <h3 className="font-semibold mb-3 flex items-center gap-2"><Code2 size={16} /> Apex Triggers</h3>
-                                <div className="space-y-2">
-                                    {activeOrg.metadataSummary.triggers.map((t: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`trigger_${t.name}`) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDevItems.has(`trigger_${t.name}`)}
-                                                onChange={() => toggleSelection(`trigger_${t.name}`)}
-                                                className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <div>
-                                                <div className="font-mono text-blue-700 font-medium">{t.name}</div>
-                                                <div className="text-slate-500 text-xs mt-1">on {t.object} ({t.events.join(', ')})</div>
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('triggers')}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Code2 size={16} className="text-blue-600" />
+                                        Apex Triggers
+                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.triggers.length})</span>
+                                    </h3>
+                                    <ChevronDown
+                                        size={20}
+                                        className={`text-slate-400 transition-transform ${expandedSections.has('triggers') ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {expandedSections.has('triggers') && (
+                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
+                                        {activeOrg.metadataSummary.triggers.map((t: any, i: number) => (
+                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`trigger_${t.name}`) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevItems.has(`trigger_${t.name}`)}
+                                                    onChange={() => toggleSelection(`trigger_${t.name}`)}
+                                                    className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <div>
+                                                    <div className="font-mono text-blue-700 font-medium">{t.name}</div>
+                                                    <div className="text-slate-500 text-xs mt-1">on {t.object} ({t.events.join(', ')})</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeOrg.metadataSummary.triggers.length === 0 && <div className="text-slate-400 text-sm">No triggers found.</div>}
-                                </div>
+                                        ))}
+                                        {activeOrg.metadataSummary.triggers.length === 0 && <div className="text-slate-400 text-sm py-2">No triggers found.</div>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* LWC & Aura Components */}
-                            <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                <h3 className="font-semibold mb-3 flex items-center gap-2"><Component size={16} /> LWC & Aura</h3>
-                                <div className="space-y-2">
-                                    {activeOrg.metadataSummary.components.map((c: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`component_${c.name}`) ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDevItems.has(`component_${c.name}`)}
-                                                onChange={() => toggleSelection(`component_${c.name}`)}
-                                                className="mt-1 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                                            />
-                                            <div>
-                                                <div className="font-mono text-purple-700 font-medium">{c.name}</div>
-                                                <div className="text-slate-500 text-xs mt-1">{c.type} • v{c.apiVersion}</div>
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('components')}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Component size={16} className="text-purple-600" />
+                                        LWC & Aura
+                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.components.length})</span>
+                                    </h3>
+                                    <ChevronDown
+                                        size={20}
+                                        className={`text-slate-400 transition-transform ${expandedSections.has('components') ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {expandedSections.has('components') && (
+                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
+                                        {activeOrg.metadataSummary.components.map((c: any, i: number) => (
+                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`component_${c.name}`) ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevItems.has(`component_${c.name}`)}
+                                                    onChange={() => toggleSelection(`component_${c.name}`)}
+                                                    className="mt-1 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                                />
+                                                <div>
+                                                    <div className="font-mono text-purple-700 font-medium">{c.name}</div>
+                                                    <div className="text-slate-500 text-xs mt-1">{c.type} • v{c.apiVersion}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeOrg.metadataSummary.components.length === 0 && <div className="text-slate-400 text-sm">No components found.</div>}
-                                </div>
+                                        ))}
+                                        {activeOrg.metadataSummary.components.length === 0 && <div className="text-slate-400 text-sm py-2">No components found.</div>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Flows */}
-                            <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                <h3 className="font-semibold mb-3 flex items-center gap-2"><Workflow size={16} /> Flows</h3>
-                                <div className="space-y-2">
-                                    {activeOrg.metadataSummary.flows.map((f: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`flow_${f.name}`) ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDevItems.has(`flow_${f.name}`)}
-                                                onChange={() => toggleSelection(`flow_${f.name}`)}
-                                                className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                            />
-                                            <div>
-                                                <div className="font-medium text-indigo-700">{f.label || f.name}</div>
-                                                <div className="text-slate-500 text-xs mt-1">{f.type} • {f.status}</div>
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('flows')}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Workflow size={16} className="text-indigo-600" />
+                                        Flows
+                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.flows.length})</span>
+                                    </h3>
+                                    <ChevronDown
+                                        size={20}
+                                        className={`text-slate-400 transition-transform ${expandedSections.has('flows') ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {expandedSections.has('flows') && (
+                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
+                                        {activeOrg.metadataSummary.flows.map((f: any, i: number) => (
+                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`flow_${f.name}`) ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevItems.has(`flow_${f.name}`)}
+                                                    onChange={() => toggleSelection(`flow_${f.name}`)}
+                                                    className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                <div>
+                                                    <div className="font-medium text-indigo-700">{f.label || f.name}</div>
+                                                    <div className="text-slate-500 text-xs mt-1">{f.type} • {f.status}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeOrg.metadataSummary.flows.length === 0 && <div className="text-slate-400 text-sm">No flows found.</div>}
-                                </div>
+                                        ))}
+                                        {activeOrg.metadataSummary.flows.length === 0 && <div className="text-slate-400 text-sm py-2">No flows found.</div>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Validation Rules */}
-                            <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                <h3 className="font-semibold mb-3 flex items-center gap-2"><ShieldCheck size={16} /> Validation Rules</h3>
-                                <div className="space-y-2">
-                                    {activeOrg.metadataSummary.validationRules.map((v: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`validation_${v.name}`) ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDevItems.has(`validation_${v.name}`)}
-                                                onChange={() => toggleSelection(`validation_${v.name}`)}
-                                                className="mt-1 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                            />
-                                            <div>
-                                                <div className="font-medium text-red-700">{v.name}</div>
-                                                <div className="text-slate-500 text-xs mt-1">{v.object}</div>
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('validations')}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <ShieldCheck size={16} className="text-red-600" />
+                                        Validation Rules
+                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.validationRules.length})</span>
+                                    </h3>
+                                    <ChevronDown
+                                        size={20}
+                                        className={`text-slate-400 transition-transform ${expandedSections.has('validations') ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {expandedSections.has('validations') && (
+                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
+                                        {activeOrg.metadataSummary.validationRules.map((v: any, i: number) => (
+                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`validation_${v.name}`) ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevItems.has(`validation_${v.name}`)}
+                                                    onChange={() => toggleSelection(`validation_${v.name}`)}
+                                                    className="mt-1 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                                />
+                                                <div>
+                                                    <div className="font-medium text-red-700">{v.name}</div>
+                                                    <div className="text-slate-500 text-xs mt-1">{v.object}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeOrg.metadataSummary.validationRules.length === 0 && <div className="text-slate-400 text-sm">No validation rules found.</div>}
-                                </div>
+                                        ))}
+                                        {activeOrg.metadataSummary.validationRules.length === 0 && <div className="text-slate-400 text-sm py-2">No validation rules found.</div>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Custom Objects */}
-                            <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                <h3 className="font-semibold mb-3 flex items-center gap-2"><Database size={16} /> Custom Objects</h3>
-                                <div className="space-y-2">
-                                    {activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').map((o: any, i: number) => (
-                                        <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`object_${o.name}`) ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDevItems.has(`object_${o.name}`)}
-                                                onChange={() => toggleSelection(`object_${o.name}`)}
-                                                className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                            />
-                                            <div>
-                                                <div className="font-medium text-emerald-700">{o.label || o.name}</div>
-                                                <div className="text-slate-500 text-xs mt-1">{o.fields?.length || 0} fields • {o.recordTypes?.length || 0} record types</div>
+                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                <button
+                                    onClick={() => toggleSection('objects')}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Database size={16} className="text-emerald-600" />
+                                        Custom Objects
+                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').length})</span>
+                                    </h3>
+                                    <ChevronDown
+                                        size={20}
+                                        className={`text-slate-400 transition-transform ${expandedSections.has('objects') ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                {expandedSections.has('objects') && (
+                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
+                                        {activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').map((o: any, i: number) => (
+                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`object_${o.name}`) ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDevItems.has(`object_${o.name}`)}
+                                                    onChange={() => toggleSelection(`object_${o.name}`)}
+                                                    className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                                <div>
+                                                    <div className="font-medium text-emerald-700">{o.label || o.name}</div>
+                                                    <div className="text-slate-500 text-xs mt-1">{o.fields?.length || 0} fields • {o.recordTypes?.length || 0} record types</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').length === 0 && <div className="text-slate-400 text-sm">No custom objects found.</div>}
-                                </div>
+                                        ))}
+                                        {activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').length === 0 && <div className="text-slate-400 text-sm py-2">No custom objects found.</div>}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
