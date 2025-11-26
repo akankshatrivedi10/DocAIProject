@@ -1,10 +1,10 @@
 
 export const TEST_CREDENTIALS = {
   salesforce: {
-    username: 'akanksha.trivedi@softwareag.com.devcpq',
-    password: 'akanksha@20',
-    consumerKey: '3MVG9zOb8H6wKLFB7zmZNpygP_lAVkRdqdrTzhSbY5eIg0WC1OIjHWegTNJ3qpjPxTPyrMMo9Av0R4mS8OQ5R',
-    consumerSecret: '908DF7011CBED34A72303BB95A30A009E4AB9BF26A889D16460CECD0D720C101',
+    username: 'docai@gmail.com',
+    password: 'akanksha10',
+    consumerKey: '3MVG97ZwUE6kNctdPkJrrYAgchEVQTolx78HA6A9OXlvYTVtA0yE9oiO1Ge06pjyFh6muNBZg9Wt747IiFaau',
+    consumerSecret: '31C5B0E479EF726E8DA6C5C284BA6022EDAF5136C34A20455227700E7EA49A62',
     securityToken: '' // Leave empty if IP is allowlisted, otherwise append to password
   },
   app: {

@@ -7,12 +7,19 @@ declare var jsforce: any;
 const PROXY_URL = 'http://localhost:8080/';
 
 export const exchangeCodeForToken = async (code: string, clientId: string, clientSecret: string): Promise<{ access_token: string, instance_url: string, refresh_token: string }> => {
+    const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
+
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
     params.append('client_id', clientId);
     params.append('client_secret', clientSecret);
     params.append('redirect_uri', 'http://localhost:3000/oauth/callback');
     params.append('code', code);
+
+    // Include PKCE code verifier
+    if (codeVerifier) {
+        params.append('code_verifier', codeVerifier);
+    }
 
     // Use local proxy to bypass CORS on token endpoint
     const tokenUrl = PROXY_URL + 'https://test.salesforce.com/services/oauth2/token';

@@ -5,7 +5,7 @@ import { OrgType } from '../types';
 interface OAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // Not used directly, but kept for interface compatibility
+  onSuccess: () => void;
   orgType: OrgType;
 }
 
@@ -14,20 +14,45 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showCustomDomain, setShowCustomDomain] = useState(true);
-  const [customDomain, setCustomDomain] = useState('softwareag--devcpq.sandbox.my.salesforce.com');
+  const [customDomain, setCustomDomain] = useState('softwareag--qa.sandbox.my.salesforce.com');
   const [consumerKey, setConsumerKey] = useState('');
   const [consumerSecret, setConsumerSecret] = useState('');
 
   if (!isOpen) return null;
 
-  const handleOAuthRedirect = () => {
+  // PKCE helper functions
+  const generateCodeVerifier = () => {
+    const array = new Uint8Array(64);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, (b) => ('0' + b.toString(16)).slice(-2)).join('');
+  };
+
+  const base64UrlEncode = (buffer: ArrayBuffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    bytes.forEach((b) => (binary += String.fromCharCode(b)));
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+
+  const sha256 = async (plain: string) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plain);
+    const hash = await window.crypto.subtle.digest('SHA-256', data);
+    return base64UrlEncode(hash);
+  };
+
+  const handleOAuthRedirect = async () => {
     setLoading(true);
 
-    // Use user-provided key or fallback to default (only for demo purposes)
-    const finalClientId = consumerKey || '3MVG9zOb8H6wKLFB7zmZNpygP_lAVkRdqdrTzhSbY5eIg0WC1OIjHWegTNJ3qpjPxTPyrMMo9Av0R4mS8OQ5R';
-    const finalClientSecret = consumerSecret || '908DF7011CBED34A72303BB95A30A009E4AB9BF26A889D16460CECD0D720C101';
+    const finalClientId = consumerKey || '3MVG97ZwUE6kNctdPkJrrYAgchEVQTolx78HA6A9OXlvYTVtA0yE9oiO1Ge06pjyFh6muNBZg9Wt747IiFaau';
+    const finalClientSecret = consumerSecret || '31C5B0E479EF726E8DA6C5C284BA6022EDAF5136C34A20455227700E7EA49A62';
 
-    // Store in session storage for the callback to use
+    // Generate PKCE code verifier and challenge
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await sha256(codeVerifier);
+
+    // Store for use during token exchange
+    sessionStorage.setItem('pkce_code_verifier', codeVerifier);
     sessionStorage.setItem('sf_consumer_key', finalClientId);
     sessionStorage.setItem('sf_consumer_secret', finalClientSecret);
 
@@ -38,13 +63,11 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
       : 'https://login.salesforce.com';
 
     if (showCustomDomain && customDomain) {
-      // Ensure protocol is present
       loginUrl = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
     }
 
-    const authUrl = `${loginUrl}/services/oauth2/authorize?response_type=code&client_id=${finalClientId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const authUrl = `${loginUrl}/services/oauth2/authorize?response_type=code&client_id=${finalClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-    // Redirect to Salesforce
     window.location.href = authUrl;
   };
 
@@ -129,7 +152,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
           <div className="mt-6 flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
             <ShieldCheck className="text-blue-600 shrink-0 mt-0.5" size={16} />
             <p className="text-xs text-blue-800">
-              We use secure OAuth 2.0. Your password is never stored on our servers.
+              We use secure OAuth 2.0 with PKCE. Your password is never stored on our servers.
             </p>
           </div>
 
