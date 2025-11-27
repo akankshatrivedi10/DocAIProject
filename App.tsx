@@ -29,6 +29,7 @@ const App: React.FC = () => {
 
   // Dev Workspace Selection State
   const [selectedDevItems, setSelectedDevItems] = useState<Set<string>>(new Set());
+  const [selectedMetadataItems, setSelectedMetadataItems] = useState<Set<string>>(new Set());
   const [chatInitialInput, setChatInitialInput] = useState<string>('');
   // App Data State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -169,6 +170,7 @@ const App: React.FC = () => {
     setOrgs(prev => [...prev, newOrg]);
     setActiveOrgId(newOrgId);
     setAuthView('APP'); // Ensure we are in the app view
+    setActiveTab(Tab.METADATA); // Redirect to Metadata Tab
 
     // Start Async Job using Real Service with Tokens
     try {
@@ -278,13 +280,7 @@ const App: React.FC = () => {
 
   // --- View Switching Logic ---
 
-  if (authView === 'LANDING') {
-    return <LandingPage setView={setAuthView} />;
-  }
-
-  if (authView === 'LOGIN' || authView === 'SIGNUP') {
-    return <AuthPage view={authView} setView={setAuthView} onAuthSuccess={handleAuthSuccess} />;
-  }
+  // --- View Switching Logic ---
 
   if (isOAuthCallback) {
     return (
@@ -297,6 +293,14 @@ const App: React.FC = () => {
         }}
       />
     );
+  }
+
+  if (authView === 'LANDING') {
+    return <LandingPage setView={setAuthView} />;
+  }
+
+  if (authView === 'LOGIN' || authView === 'SIGNUP') {
+    return <AuthPage view={authView} setView={setAuthView} onAuthSuccess={handleAuthSuccess} />;
   }
 
   // --- Main App Logic ---
@@ -334,8 +338,8 @@ const App: React.FC = () => {
 
         {activeTab === Tab.DASHBOARD && <Dashboard orgs={orgs} />}
         {activeTab === Tab.INTEGRATIONS && <Integrations orgs={orgs} integrations={integrations} activeOrgId={activeOrgId} setActiveOrgId={setActiveOrgId} initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }} />}
-        {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} />}
-        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={() => handleGenerateDoc('DEV')} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+        {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} selectedItems={selectedMetadataItems} onSelectionChange={setSelectedMetadataItems} />}
+        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={() => handleGenerateDoc('DEV')} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} selectedItems={selectedMetadataItems} />}
         {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
         {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
         {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}

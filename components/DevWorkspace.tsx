@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bot, RefreshCw, FileText, Code2, Component, Sparkles, BookOpen, Database, Workflow, ShieldCheck, ChevronDown } from 'lucide-react';
+import React from 'react';
+import { Bot, RefreshCw, FileText, Code2, Component, Sparkles, BookOpen, Database, Workflow, ShieldCheck } from 'lucide-react';
 import { Org, Tab } from '../types';
 
 interface DevWorkspaceProps {
@@ -9,6 +9,7 @@ interface DevWorkspaceProps {
     setChatInitialInput: (input: string) => void;
     isGeneratingDoc: boolean;
     docContent: string;
+    selectedItems: Set<string>;
 }
 
 const DevWorkspace: React.FC<DevWorkspaceProps> = ({
@@ -17,93 +18,94 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
     onGenerateDoc,
     setChatInitialInput,
     isGeneratingDoc,
-    docContent
+    docContent,
+    selectedItems
 }) => {
-    const [selectedDevItems, setSelectedDevItems] = useState<Set<string>>(new Set());
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+    const groupedItems = React.useMemo(() => {
+        const groups = {
+            objects: [] as string[],
+            apex: [] as string[],
+            triggers: [] as string[],
+            flows: [] as string[],
+            components: [] as string[],
+            validations: [] as string[],
+            profiles: [] as string[]
+        };
 
-    const toggleSelection = (id: string) => {
-        const newSet = new Set(selectedDevItems);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-        }
-        setSelectedDevItems(newSet);
-    };
+        selectedItems.forEach(id => {
+            const [type, ...nameParts] = id.split('-');
+            const name = nameParts.join('-');
+            if (type === 'object') groups.objects.push(name);
+            else if (type === 'apex') groups.apex.push(name);
+            else if (type === 'trigger') groups.triggers.push(name);
+            else if (type === 'flow') groups.flows.push(name);
+            else if (type === 'component') groups.components.push(name);
+            else if (type === 'validation') groups.validations.push(name);
+            else if (type === 'profile') groups.profiles.push(name);
+        });
 
-    const toggleSection = (section: string) => {
-        const newSet = new Set(expandedSections);
-        if (newSet.has(section)) {
-            newSet.delete(section);
-        } else {
-            newSet.add(section);
-        }
-        setExpandedSections(newSet);
-    };
+        return groups;
+    }, [selectedItems]);
 
     const getSelectedNames = () => {
-        if (!activeOrg?.metadataSummary) return [];
-        const selectedNames: string[] = [];
+        const names: string[] = [];
+        selectedItems.forEach(id => {
+            const [type, ...nameParts] = id.split('-');
+            const name = nameParts.join('-');
 
-        // Apex Classes
-        activeOrg.metadataSummary.apexClasses.forEach((a: any) => {
-            if (selectedDevItems.has(`apex_${a.name}`)) selectedNames.push(`Apex Class: ${a.name}`);
+            if (type === 'object') names.push(`Object: ${name}`);
+            else if (type === 'apex') names.push(`Apex Class: ${name}`);
+            else if (type === 'trigger') names.push(`Trigger: ${name}`);
+            else if (type === 'flow') names.push(`Flow: ${name}`);
+            else if (type === 'component') names.push(`Component: ${name}`);
+            else if (type === 'validation') names.push(`Validation Rule: ${name}`);
+            else if (type === 'profile') names.push(`Profile: ${name}`);
         });
-
-        // Triggers
-        activeOrg.metadataSummary.triggers.forEach((t: any) => {
-            if (selectedDevItems.has(`trigger_${t.name}`)) selectedNames.push(`Trigger: ${t.name}`);
-        });
-
-        // Components (LWC & Aura)
-        activeOrg.metadataSummary.components.forEach((c: any) => {
-            if (selectedDevItems.has(`component_${c.name}`)) selectedNames.push(`Component: ${c.name}`);
-        });
-
-        // Flows
-        activeOrg.metadataSummary.flows.forEach((f: any) => {
-            if (selectedDevItems.has(`flow_${f.name}`)) selectedNames.push(`Flow: ${f.label || f.name}`);
-        });
-
-        // Validation Rules
-        activeOrg.metadataSummary.validationRules.forEach((v: any) => {
-            if (selectedDevItems.has(`validation_${v.name}`)) selectedNames.push(`Validation Rule: ${v.name} (${v.object})`);
-        });
-
-        // Custom Objects
-        activeOrg.metadataSummary.objects.forEach((o: any) => {
-            if (selectedDevItems.has(`object_${o.name}`)) selectedNames.push(`Object: ${o.label || o.name}`);
-        });
-
-        return selectedNames;
+        return names;
     };
 
     const handleAskAI = () => {
-        const selectedNames = getSelectedNames();
-        if (selectedNames.length > 0) {
-            setChatInitialInput(`I have questions about the following items:\n- ${selectedNames.join('\n- ')}\n\nCan you explain how they work?`);
+        const names = getSelectedNames();
+        if (names.length > 0) {
+            setChatInitialInput(`I have questions about the following items:\n- ${names.join('\n- ')}\n\nCan you explain how they work?`);
             setActiveTab(Tab.CHAT);
-            setSelectedDevItems(new Set());
         }
     };
 
     const handleEnhance = () => {
-        const selectedNames = getSelectedNames();
-        if (selectedNames.length > 0) {
-            setChatInitialInput(`Please analyze the following components and suggest enhancements based on Salesforce best practices:\n- ${selectedNames.join('\n- ')}`);
+        const names = getSelectedNames();
+        if (names.length > 0) {
+            setChatInitialInput(`Please analyze the following components and suggest enhancements based on Salesforce best practices:\n- ${names.join('\n- ')}`);
             setActiveTab(Tab.CHAT);
-            setSelectedDevItems(new Set());
         }
     };
 
     const handleDocumentSelection = () => {
-        const selectedNames = getSelectedNames();
-        if (selectedNames.length > 0) {
-            setChatInitialInput(`Please generate detailed technical documentation for the following components:\n- ${selectedNames.join('\n- ')}`);
+        const names = getSelectedNames();
+        if (names.length > 0) {
+            setChatInitialInput(`Please generate detailed technical documentation for the following components:\n- ${names.join('\n- ')}`);
             setActiveTab(Tab.CHAT);
-            setSelectedDevItems(new Set());
         }
+    };
+
+    const renderGroup = (title: string, items: string[], icon: React.ElementType, color: string) => {
+        if (items.length === 0) return null;
+        return (
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-3">
+                <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                    {React.createElement(icon, { size: 16, className: `text-${color}-600` })}
+                    <h3 className="font-semibold text-sm text-slate-700">{title}</h3>
+                    <span className="text-xs bg-white border border-slate-200 px-1.5 rounded text-slate-500">{items.length}</span>
+                </div>
+                <div className="p-2 space-y-1">
+                    {items.map((item, i) => (
+                        <div key={i} className="px-3 py-2 text-sm text-slate-600 bg-white border border-slate-100 rounded hover:border-blue-300 transition-colors">
+                            {item}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -113,11 +115,11 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
                     <div className="p-2 bg-white border rounded-lg shadow-sm"><Code2 className="text-slate-700" size={24} /></div>
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800">Developer Workspace</h2>
-                        <p className="text-slate-500 text-sm">AI-powered workspace tailored for dev roles.</p>
+                        <p className="text-slate-500 text-sm">AI-powered workspace for selected metadata.</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    {selectedDevItems.size > 0 && (
+                    {selectedItems.size > 0 && (
                         <>
                             <button
                                 onClick={handleEnhance}
@@ -154,232 +156,29 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
             </div>
 
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
-                {/* Left Panel: Context/Shortcuts */}
+                {/* Left Panel: Selected Context */}
                 <div className="space-y-6 overflow-y-auto pr-2">
-                    {/* Role specific content cards */}
-                    {activeOrg?.metadataSummary && (
-                        <div className="space-y-3">
-                            {/* Apex Classes */}
-                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <button
-                                    onClick={() => toggleSection('apexClasses')}
-                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                >
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        <Code2 size={16} className="text-blue-600" />
-                                        Apex Classes
-                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.apexClasses.length})</span>
-                                    </h3>
-                                    <ChevronDown
-                                        size={20}
-                                        className={`text-slate-400 transition-transform ${expandedSections.has('apexClasses') ? 'rotate-180' : ''}`}
-                                    />
-                                </button>
-                                {expandedSections.has('apexClasses') && (
-                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
-                                        {activeOrg.metadataSummary.apexClasses.map((a: any, i: number) => (
-                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`apex_${a.name}`) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevItems.has(`apex_${a.name}`)}
-                                                    onChange={() => toggleSelection(`apex_${a.name}`)}
-                                                    className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <div>
-                                                    <div className="font-mono text-blue-700 font-medium">{a.name}</div>
-                                                    <div className="text-slate-500 text-xs mt-1">v{a.apiVersion} • {a.status}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {activeOrg.metadataSummary.apexClasses.length === 0 && <div className="text-slate-400 text-sm py-2">No Apex classes found.</div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Apex Triggers */}
-                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <button
-                                    onClick={() => toggleSection('triggers')}
-                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                >
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        <Code2 size={16} className="text-blue-600" />
-                                        Apex Triggers
-                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.triggers.length})</span>
-                                    </h3>
-                                    <ChevronDown
-                                        size={20}
-                                        className={`text-slate-400 transition-transform ${expandedSections.has('triggers') ? 'rotate-180' : ''}`}
-                                    />
-                                </button>
-                                {expandedSections.has('triggers') && (
-                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
-                                        {activeOrg.metadataSummary.triggers.map((t: any, i: number) => (
-                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`trigger_${t.name}`) ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevItems.has(`trigger_${t.name}`)}
-                                                    onChange={() => toggleSelection(`trigger_${t.name}`)}
-                                                    className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <div>
-                                                    <div className="font-mono text-blue-700 font-medium">{t.name}</div>
-                                                    <div className="text-slate-500 text-xs mt-1">on {t.object} ({t.events.join(', ')})</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {activeOrg.metadataSummary.triggers.length === 0 && <div className="text-slate-400 text-sm py-2">No triggers found.</div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* LWC & Aura Components */}
-                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <button
-                                    onClick={() => toggleSection('components')}
-                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                >
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        <Component size={16} className="text-purple-600" />
-                                        LWC & Aura
-                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.components.length})</span>
-                                    </h3>
-                                    <ChevronDown
-                                        size={20}
-                                        className={`text-slate-400 transition-transform ${expandedSections.has('components') ? 'rotate-180' : ''}`}
-                                    />
-                                </button>
-                                {expandedSections.has('components') && (
-                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
-                                        {activeOrg.metadataSummary.components.map((c: any, i: number) => (
-                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`component_${c.name}`) ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevItems.has(`component_${c.name}`)}
-                                                    onChange={() => toggleSelection(`component_${c.name}`)}
-                                                    className="mt-1 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                                                />
-                                                <div>
-                                                    <div className="font-mono text-purple-700 font-medium">{c.name}</div>
-                                                    <div className="text-slate-500 text-xs mt-1">{c.type} • v{c.apiVersion}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {activeOrg.metadataSummary.components.length === 0 && <div className="text-slate-400 text-sm py-2">No components found.</div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Flows */}
-                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <button
-                                    onClick={() => toggleSection('flows')}
-                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                >
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        <Workflow size={16} className="text-indigo-600" />
-                                        Flows
-                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.flows.length})</span>
-                                    </h3>
-                                    <ChevronDown
-                                        size={20}
-                                        className={`text-slate-400 transition-transform ${expandedSections.has('flows') ? 'rotate-180' : ''}`}
-                                    />
-                                </button>
-                                {expandedSections.has('flows') && (
-                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
-                                        {activeOrg.metadataSummary.flows.map((f: any, i: number) => (
-                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`flow_${f.name}`) ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevItems.has(`flow_${f.name}`)}
-                                                    onChange={() => toggleSelection(`flow_${f.name}`)}
-                                                    className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                />
-                                                <div>
-                                                    <div className="font-medium text-indigo-700">{f.label || f.name}</div>
-                                                    <div className="text-slate-500 text-xs mt-1">{f.type} • {f.status}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {activeOrg.metadataSummary.flows.length === 0 && <div className="text-slate-400 text-sm py-2">No flows found.</div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Validation Rules */}
-                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <button
-                                    onClick={() => toggleSection('validations')}
-                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                >
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        <ShieldCheck size={16} className="text-red-600" />
-                                        Validation Rules
-                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.validationRules.length})</span>
-                                    </h3>
-                                    <ChevronDown
-                                        size={20}
-                                        className={`text-slate-400 transition-transform ${expandedSections.has('validations') ? 'rotate-180' : ''}`}
-                                    />
-                                </button>
-                                {expandedSections.has('validations') && (
-                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
-                                        {activeOrg.metadataSummary.validationRules.map((v: any, i: number) => (
-                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`validation_${v.name}`) ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevItems.has(`validation_${v.name}`)}
-                                                    onChange={() => toggleSelection(`validation_${v.name}`)}
-                                                    className="mt-1 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                                />
-                                                <div>
-                                                    <div className="font-medium text-red-700">{v.name}</div>
-                                                    <div className="text-slate-500 text-xs mt-1">{v.object}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {activeOrg.metadataSummary.validationRules.length === 0 && <div className="text-slate-400 text-sm py-2">No validation rules found.</div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Custom Objects */}
-                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                <button
-                                    onClick={() => toggleSection('objects')}
-                                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                                >
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        <Database size={16} className="text-emerald-600" />
-                                        Custom Objects
-                                        <span className="text-xs font-normal text-slate-500">({activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').length})</span>
-                                    </h3>
-                                    <ChevronDown
-                                        size={20}
-                                        className={`text-slate-400 transition-transform ${expandedSections.has('objects') ? 'rotate-180' : ''}`}
-                                    />
-                                </button>
-                                {expandedSections.has('objects') && (
-                                    <div className="px-4 pb-4 space-y-2 border-t border-slate-100">
-                                        {activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').map((o: any, i: number) => (
-                                            <div key={i} className={`p-3 rounded border text-sm transition-colors flex items-start gap-3 ${selectedDevItems.has(`object_${o.name}`) ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDevItems.has(`object_${o.name}`)}
-                                                    onChange={() => toggleSelection(`object_${o.name}`)}
-                                                    className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                                />
-                                                <div>
-                                                    <div className="font-medium text-emerald-700">{o.label || o.name}</div>
-                                                    <div className="text-slate-500 text-xs mt-1">{o.fields?.length || 0} fields • {o.recordTypes?.length || 0} record types</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {activeOrg.metadataSummary.objects.filter((o: any) => o.type === 'Custom').length === 0 && <div className="text-slate-400 text-sm py-2">No custom objects found.</div>}
-                                    </div>
-                                )}
-                            </div>
+                    {selectedItems.size === 0 ? (
+                        <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-xl">
+                            <Database className="mx-auto text-slate-300 mb-3" size={32} />
+                            <p className="text-slate-500 font-medium">No metadata selected</p>
+                            <p className="text-slate-400 text-sm mt-1">Go to Metadata Explorer to select items for analysis.</p>
+                            <button
+                                onClick={() => setActiveTab(Tab.METADATA)}
+                                className="mt-4 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100"
+                            >
+                                Go to Explorer
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Selected Context</h3>
+                            {renderGroup('Objects', groupedItems.objects, Database, 'emerald')}
+                            {renderGroup('Apex Classes', groupedItems.apex, Code2, 'blue')}
+                            {renderGroup('Triggers', groupedItems.triggers, Code2, 'blue')}
+                            {renderGroup('Flows', groupedItems.flows, Workflow, 'indigo')}
+                            {renderGroup('Components', groupedItems.components, Component, 'purple')}
+                            {renderGroup('Validation Rules', groupedItems.validations, ShieldCheck, 'red')}
                         </div>
                     )}
                 </div>
@@ -396,7 +195,7 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
                                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-2">
                                     <FileText className="opacity-20" size={24} />
                                 </div>
-                                <p>Click "Generate Guide" to create developer documentation.</p>
+                                <p>Click "Generate Guide" or use the action buttons above.</p>
                             </div>
                         ) : (
                             <div className="whitespace-pre-wrap font-sans text-slate-700">{docContent}</div>

@@ -19,10 +19,12 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
-import { Org } from '../types';
+import { Org, MetadataSummary } from '../types';
 
 interface MetadataExplorerProps {
     activeOrg: Org | null;
+    selectedItems: Set<string>;
+    onSelectionChange: (items: Set<string>) => void;
 }
 
 type ViewMode = 'object-centric' | 'component-centric';
@@ -37,10 +39,10 @@ interface MetadataItem {
     metadata?: any;
 }
 
-const MetadataExplorer: React.FC<MetadataExplorerProps> = ({ activeOrg }) => {
+const MetadataExplorer: React.FC<MetadataExplorerProps> = ({ activeOrg, selectedItems, onSelectionChange }) => {
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
     const [selectedItem, setSelectedItem] = useState<MetadataItem | null>(null);
-    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+    // Removed local selectedItems state
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<ViewMode>('object-centric');
 
@@ -211,7 +213,7 @@ const MetadataExplorer: React.FC<MetadataExplorerProps> = ({ activeOrg }) => {
         } else {
             newSelected.add(itemId);
         }
-        setSelectedItems(newSelected);
+        onSelectionChange(newSelected);
     };
 
     const toggleCategorySelection = (categoryKey: string) => {
@@ -233,7 +235,7 @@ const MetadataExplorer: React.FC<MetadataExplorerProps> = ({ activeOrg }) => {
                 }
             }
         });
-        setSelectedItems(newSelected);
+        onSelectionChange(newSelected);
     };
 
     const renderCategorySection = (
