@@ -277,3 +277,26 @@ export interface CustomerProfile {
   usage: UsageMetrics;
   limits: UsageLimits;
 }
+
+export enum MetadataType {
+  OBJECT = 'Object',
+  APEX_CLASS = 'Apex Class',
+  TRIGGER = 'Trigger',
+  FLOW = 'Flow',
+  COMPONENT = 'Component',
+  LAYOUT = 'Layout',
+  PERMISSION_SET = 'Permission Set',
+  VALIDATION_RULE = 'Validation Rule',
+  PROFILE = 'Profile'
+}
+
+export interface MetadataItem {
+  id: string;
+  name: string;
+  label: string;
+  type: string; // Can be string or MetadataType
+  category: 'standard-objects' | 'custom-objects' | 'system-components' | 'global-metadata';
+  children?: MetadataItem[];
+  metadata?: any;
+  lastModifiedDate?: string;
+}

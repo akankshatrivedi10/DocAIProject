@@ -8,6 +8,7 @@ interface IntegrationsProps {
     activeOrgId: string | null;
     setActiveOrgId: (id: string) => void;
     initiateAddOrg: (type: OrgType) => void;
+    onConnectJira?: () => void;
 }
 
 const Integrations: React.FC<IntegrationsProps> = ({
@@ -15,10 +16,88 @@ const Integrations: React.FC<IntegrationsProps> = ({
     integrations,
     activeOrgId,
     setActiveOrgId,
-    initiateAddOrg
+    initiateAddOrg,
+    onConnectJira
 }) => {
+    const [showJiraModal, setShowJiraModal] = React.useState(false);
+    const [jiraCreds, setJiraCreds] = React.useState({ domain: '', email: '', token: '' });
+    const [isConnectingJira, setIsConnectingJira] = React.useState(false);
+    const [jiraError, setJiraError] = React.useState('');
+
+    const handleConnectJira = async () => {
+        setIsConnectingJira(true);
+        setJiraError('');
+        try {
+            const success = await import('../services/jiraService').then(m => m.authenticateJira(jiraCreds.domain, jiraCreds.email, jiraCreds.token));
+            if (success) {
+                // In a real app, we would update the global integrations state here
+                // For now, we'll just close the modal and pretend it worked
+                if (onConnectJira) onConnectJira();
+                setShowJiraModal(false);
+                alert("Jira integration connected successfully. You can now select a Jira Story to include its context in your Technical Documentation.");
+            } else {
+                setJiraError('Jira authentication failed. Please check your credentials or permissions.');
+            }
+        } catch (e) {
+            setJiraError('An error occurred while connecting to Jira.');
+        } finally {
+            setIsConnectingJira(false);
+        }
+    };
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 relative">
+            {showJiraModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
+                        <h3 className="text-lg font-bold mb-4">Connect Jira</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Jira Domain</label>
+                                <input
+                                    type="text"
+                                    className="w-full border rounded p-2 text-sm"
+                                    placeholder="your-domain.atlassian.net"
+                                    value={jiraCreds.domain}
+                                    onChange={e => setJiraCreds({ ...jiraCreds, domain: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    className="w-full border rounded p-2 text-sm"
+                                    placeholder="email@example.com"
+                                    value={jiraCreds.email}
+                                    onChange={e => setJiraCreds({ ...jiraCreds, email: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">API Token</label>
+                                <input
+                                    type="password"
+                                    className="w-full border rounded p-2 text-sm"
+                                    placeholder="Atlassian API Token"
+                                    value={jiraCreds.token}
+                                    onChange={e => setJiraCreds({ ...jiraCreds, token: e.target.value })}
+                                />
+                            </div>
+                            {jiraError && <p className="text-xs text-red-500">{jiraError}</p>}
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button onClick={() => setShowJiraModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Cancel</button>
+                                <button
+                                    onClick={handleConnectJira}
+                                    disabled={isConnectingJira}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {isConnectingJira ? 'Connecting...' : 'Connect'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800">Integrations & Connections</h2>
@@ -93,7 +172,12 @@ const Integrations: React.FC<IntegrationsProps> = ({
                                     <p className="text-xs text-slate-500">Read/Write Access</p>
                                 </div>
                             </div>
-                            <button className="text-sm text-slate-600 font-medium px-3 py-1.5 border rounded hover:bg-slate-50">Connect</button>
+                            <button
+                                onClick={() => int.type === IntegrationType.JIRA ? setShowJiraModal(true) : null}
+                                className="text-sm text-slate-600 font-medium px-3 py-1.5 border rounded hover:bg-slate-50"
+                            >
+                                {int.status === ConnectionStatus.CONNECTED ? 'Connected' : 'Connect'}
+                            </button>
                         </div>
                     ))}
                 </div>

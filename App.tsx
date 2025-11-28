@@ -8,7 +8,7 @@ import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPages';
 import OAuthModal from './components/OAuthModal';
 import OAuthCallback from './components/OAuthCallback';
-import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User } from './types';
+import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User, MetadataItem, MetadataType } from './types';
 // Switched to real service
 // Switched to real service
 import { performRealSync } from './services/realSalesforceService';
@@ -259,10 +259,43 @@ const App: React.FC = () => {
     }
   };
 
+  const resolvedSelectedItems = React.useMemo(() => {
+    if (!activeOrg?.metadataSummary) return [];
+    const summary = activeOrg.metadataSummary;
+    const resolved: MetadataItem[] = [];
+
+    // Helper to check and add
+    const check = (id: string, name: string, type: MetadataType, label?: string, metadata?: any) => {
+      if (selectedMetadataItems.has(id)) {
+        resolved.push({
+          id,
+          name,
+          label: label || name,
+          type,
+          category: 'system-components', // Defaulting for now
+          metadata,
+          lastModifiedDate: new Date().toLocaleDateString() // Mock date
+        });
+      }
+    };
+
+    summary.objects.forEach(o => check(`object-${o.name}`, o.name, MetadataType.OBJECT, o.label, o));
+    summary.apexClasses.forEach(a => check(`apex-${a.name}`, a.name, MetadataType.APEX_CLASS, a.name, a));
+    summary.triggers.forEach(t => check(`trigger-${t.name}`, t.name, MetadataType.TRIGGER, t.name, t));
+    summary.flows.forEach(f => check(`flow-${f.name}`, f.name, MetadataType.FLOW, f.label, f));
+    summary.components.forEach(c => check(`component-${c.name}`, c.name, MetadataType.COMPONENT, c.name, c));
+    summary.validationRules.forEach(v => check(`validation-${v.name}`, v.name, MetadataType.VALIDATION_RULE, v.name, v));
+    summary.profiles.forEach(p => check(`profile-${p.name}`, p.name, MetadataType.PROFILE, p.name, p));
+
+    return resolved;
+  }, [activeOrg, selectedMetadataItems]);
+
   const handleGenerateDoc = async (role: 'DEV' | 'GTM' | 'SALES' = 'DEV', specificRole?: string, processName?: string) => {
     if (!activeOrg?.metadataSummary) return;
     setIsGeneratingDoc(true);
-    const content = await generateRoleBasedDoc(role, specificRole, processName, activeOrg.metadataSummary);
+    const jiraIntegration = integrations.find(i => i.type === IntegrationType.JIRA);
+    const isJiraConnected = jiraIntegration?.status === ConnectionStatus.CONNECTED;
+    const content = await generateRoleBasedDoc(role, specificRole, processName, activeOrg.metadataSummary, isJiraConnected);
     setDocContent(content);
     setIsGeneratingDoc(false);
 
@@ -337,9 +370,20 @@ const App: React.FC = () => {
         </div>
 
         {activeTab === Tab.DASHBOARD && <Dashboard orgs={orgs} />}
-        {activeTab === Tab.INTEGRATIONS && <Integrations orgs={orgs} integrations={integrations} activeOrgId={activeOrgId} setActiveOrgId={setActiveOrgId} initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }} />}
+        {activeTab === Tab.INTEGRATIONS && <Integrations
+          orgs={orgs}
+          integrations={integrations}
+          activeOrgId={activeOrgId}
+          setActiveOrgId={setActiveOrgId}
+          initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }}
+          onConnectJira={() => {
+            setIntegrations(prev => prev.map(i =>
+              i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED } : i
+            ));
+          }}
+        />}
         {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} selectedItems={selectedMetadataItems} onSelectionChange={setSelectedMetadataItems} />}
-        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={() => handleGenerateDoc('DEV')} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} selectedItems={selectedMetadataItems} />}
+        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={(story) => handleGenerateDoc('DEV', undefined, story)} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} selectedItems={resolvedSelectedItems} isJiraConnected={integrations.find(i => i.type === IntegrationType.JIRA)?.status === ConnectionStatus.CONNECTED} />}
         {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
         {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
         {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}

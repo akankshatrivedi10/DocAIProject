@@ -19,7 +19,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
-import { Org, MetadataSummary } from '../types';
+import { Org, MetadataSummary, MetadataItem } from '../types';
 
 interface MetadataExplorerProps {
     activeOrg: Org | null;
@@ -29,15 +29,6 @@ interface MetadataExplorerProps {
 
 type ViewMode = 'object-centric' | 'component-centric';
 
-interface MetadataItem {
-    id: string;
-    name: string;
-    label: string;
-    type: string;
-    category: 'standard-objects' | 'custom-objects' | 'system-components' | 'global-metadata';
-    children?: MetadataItem[];
-    metadata?: any;
-}
 
 const MetadataExplorer: React.FC<MetadataExplorerProps> = ({ activeOrg, selectedItems, onSelectionChange }) => {
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());

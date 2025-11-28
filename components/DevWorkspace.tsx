@@ -1,15 +1,18 @@
-import React from 'react';
-import { Bot, RefreshCw, FileText, Code2, Component, Sparkles, BookOpen, Database, Workflow, ShieldCheck } from 'lucide-react';
-import { Org, Tab } from '../types';
+import React, { useEffect, useState } from 'react';
+import { Org, MetadataItem, MetadataType, Tab } from '../types';
+import { FileCode, Database, Zap, Layout, Shield, Workflow, Box, MessageSquare, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { getJiraProjects, getJiraStories, JiraProject, JiraStory } from '../services/jiraService';
 
 interface DevWorkspaceProps {
     activeOrg: Org | null;
     setActiveTab: (tab: Tab) => void;
-    onGenerateDoc: () => void;
+    onGenerateDoc: (story?: string) => void;
     setChatInitialInput: (input: string) => void;
     isGeneratingDoc: boolean;
     docContent: string;
-    selectedItems: Set<string>;
+    selectedItems: MetadataItem[];
+    isJiraConnected?: boolean;
 }
 
 const DevWorkspace: React.FC<DevWorkspaceProps> = ({
@@ -19,137 +22,97 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
     setChatInitialInput,
     isGeneratingDoc,
     docContent,
-    selectedItems
+    selectedItems,
+    isJiraConnected = false
 }) => {
-    const groupedItems = React.useMemo(() => {
-        const groups = {
-            objects: [] as string[],
-            apex: [] as string[],
-            triggers: [] as string[],
-            flows: [] as string[],
-            components: [] as string[],
-            validations: [] as string[],
-            profiles: [] as string[]
-        };
+    const [jiraStoryInput, setJiraStoryInput] = useState('');
 
-        selectedItems.forEach(id => {
-            const [type, ...nameParts] = id.split('-');
-            const name = nameParts.join('-');
-            if (type === 'object') groups.objects.push(name);
-            else if (type === 'apex') groups.apex.push(name);
-            else if (type === 'trigger') groups.triggers.push(name);
-            else if (type === 'flow') groups.flows.push(name);
-            else if (type === 'component') groups.components.push(name);
-            else if (type === 'validation') groups.validations.push(name);
-            else if (type === 'profile') groups.profiles.push(name);
-        });
+    // Jira Selection State
+    const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([]);
+    const [selectedProject, setSelectedProject] = useState<string>('');
+    const [jiraStories, setJiraStories] = useState<JiraStory[]>([]);
+    const [selectedStoryId, setSelectedStoryId] = useState<string>('');
+    const [selectedStoryDetails, setSelectedStoryDetails] = useState<JiraStory | null>(null);
 
-        return groups;
-    }, [selectedItems]);
+    useEffect(() => {
+        if (isJiraConnected) {
+            getJiraProjects().then(setJiraProjects);
+        }
+    }, [isJiraConnected]);
 
-    const getSelectedNames = () => {
-        const names: string[] = [];
-        selectedItems.forEach(id => {
-            const [type, ...nameParts] = id.split('-');
-            const name = nameParts.join('-');
+    useEffect(() => {
+        if (selectedProject) {
+            getJiraStories(selectedProject).then(setJiraStories);
+        } else {
+            setJiraStories([]);
+        }
+    }, [selectedProject]);
 
-            if (type === 'object') names.push(`Object: ${name}`);
-            else if (type === 'apex') names.push(`Apex Class: ${name}`);
-            else if (type === 'trigger') names.push(`Trigger: ${name}`);
-            else if (type === 'flow') names.push(`Flow: ${name}`);
-            else if (type === 'component') names.push(`Component: ${name}`);
-            else if (type === 'validation') names.push(`Validation Rule: ${name}`);
-            else if (type === 'profile') names.push(`Profile: ${name}`);
-        });
-        return names;
-    };
+    useEffect(() => {
+        if (selectedStoryId) {
+            const story = jiraStories.find(s => s.id === selectedStoryId);
+            setSelectedStoryDetails(story || null);
+        } else {
+            setSelectedStoryDetails(null);
+        }
+    }, [selectedStoryId, jiraStories]);
 
-    const handleAskAI = () => {
-        const names = getSelectedNames();
-        if (names.length > 0) {
-            setChatInitialInput(`I have questions about the following items:\n- ${names.join('\n- ')}\n\nCan you explain how they work?`);
-            setActiveTab(Tab.CHAT);
+    const getIconForType = (type: MetadataType) => {
+        switch (type) {
+            case MetadataType.APEX_CLASS: return <FileCode size={16} className="text-blue-600" />;
+            case MetadataType.FLOW: return <Workflow size={16} className="text-purple-600" />;
+            case MetadataType.OBJECT: return <Database size={16} className="text-emerald-600" />;
+            case MetadataType.TRIGGER: return <Zap size={16} className="text-orange-600" />;
+            case MetadataType.LAYOUT: return <Layout size={16} className="text-indigo-600" />;
+            case MetadataType.PERMISSION_SET: return <Shield size={16} className="text-red-600" />;
+            default: return <Box size={16} className="text-slate-600" />;
         }
     };
 
-    const handleEnhance = () => {
-        const names = getSelectedNames();
-        if (names.length > 0) {
-            setChatInitialInput(`Please analyze the following components and suggest enhancements based on Salesforce best practices:\n- ${names.join('\n- ')}`);
-            setActiveTab(Tab.CHAT);
-        }
-    };
+    const groupedItems = selectedItems.reduce((acc, item) => {
+        if (!acc[item.type]) acc[item.type] = [];
+        acc[item.type].push(item);
+        return acc;
+    }, {} as Record<MetadataType, MetadataItem[]>);
 
-    const handleDocumentSelection = () => {
-        const names = getSelectedNames();
-        if (names.length > 0) {
-            setChatInitialInput(`Please generate detailed technical documentation for the following components:\n- ${names.join('\n- ')}`);
-            setActiveTab(Tab.CHAT);
+    const handleGenerateClick = () => {
+        if (isJiraConnected && selectedStoryDetails) {
+            // Format the story details into a context string
+            const context = `
+Story ID: ${selectedStoryDetails.key}
+Title: ${selectedStoryDetails.title}
+Description: ${selectedStoryDetails.description}
+Acceptance Criteria: ${selectedStoryDetails.acceptanceCriteria}
+Status: ${selectedStoryDetails.status}
+Epic: ${selectedStoryDetails.epic || 'None'}
+            `.trim();
+            onGenerateDoc(context);
+        } else {
+            onGenerateDoc(jiraStoryInput);
         }
-    };
-
-    const renderGroup = (title: string, items: string[], icon: React.ElementType, color: string) => {
-        if (items.length === 0) return null;
-        return (
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-3">
-                <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                    {React.createElement(icon, { size: 16, className: `text-${color}-600` })}
-                    <h3 className="font-semibold text-sm text-slate-700">{title}</h3>
-                    <span className="text-xs bg-white border border-slate-200 px-1.5 rounded text-slate-500">{items.length}</span>
-                </div>
-                <div className="p-2 space-y-1">
-                    {items.map((item, i) => (
-                        <div key={i} className="px-3 py-2 text-sm text-slate-600 bg-white border border-slate-100 rounded hover:border-blue-300 transition-colors">
-                            {item}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
     };
 
     return (
         <div className="h-full flex flex-col">
             <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white border rounded-lg shadow-sm"><Code2 className="text-slate-700" size={24} /></div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Developer Workspace</h2>
-                        <p className="text-slate-500 text-sm">AI-powered workspace for selected metadata.</p>
-                    </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Developer Workspace</h2>
+                    <p className="text-slate-500 text-sm">Generate technical documentation and architecture guides.</p>
                 </div>
-                <div className="flex gap-2">
-                    {selectedItems.size > 0 && (
-                        <>
-                            <button
-                                onClick={handleEnhance}
-                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center gap-2 animate-in fade-in zoom-in duration-200"
-                            >
-                                <Sparkles size={16} />
-                                Enhance
-                            </button>
-                            <button
-                                onClick={handleDocumentSelection}
-                                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 flex items-center gap-2 animate-in fade-in zoom-in duration-200"
-                            >
-                                <BookOpen size={16} />
-                                Document
-                            </button>
-                            <button
-                                onClick={handleAskAI}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2 animate-in fade-in zoom-in duration-200"
-                            >
-                                <Bot size={16} />
-                                Chat
-                            </button>
-                        </>
-                    )}
+                <div className="flex gap-3">
                     <button
-                        onClick={onGenerateDoc}
-                        disabled={isGeneratingDoc || !activeOrg}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
+                        onClick={() => setChatInitialInput("Analyze this component structure")}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
                     >
-                        {isGeneratingDoc ? <RefreshCw className="animate-spin" size={14} /> : <FileText size={14} />}
+                        <MessageSquare size={18} />
+                        Chat
+                    </button>
+                    <button
+                        onClick={handleGenerateClick}
+                        disabled={isGeneratingDoc || selectedItems.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                    >
+                        {isGeneratingDoc ? <span className="animate-spin">⏳</span> : <Sparkles size={18} />}
                         Generate Guide
                     </button>
                 </div>
@@ -158,47 +121,108 @@ const DevWorkspace: React.FC<DevWorkspaceProps> = ({
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
                 {/* Left Panel: Selected Context */}
                 <div className="space-y-6 overflow-y-auto pr-2">
-                    {selectedItems.size === 0 ? (
-                        <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-xl">
-                            <Database className="mx-auto text-slate-300 mb-3" size={32} />
-                            <p className="text-slate-500 font-medium">No metadata selected</p>
-                            <p className="text-slate-400 text-sm mt-1">Go to Metadata Explorer to select items for analysis.</p>
-                            <button
-                                onClick={() => setActiveTab(Tab.METADATA)}
-                                className="mt-4 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100"
-                            >
-                                Go to Explorer
-                            </button>
+
+                    {/* Jira Context Section */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jira Story Context</h3>
+                            {isJiraConnected && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Connected</span>}
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Selected Context</h3>
-                            {renderGroup('Objects', groupedItems.objects, Database, 'emerald')}
-                            {renderGroup('Apex Classes', groupedItems.apex, Code2, 'blue')}
-                            {renderGroup('Triggers', groupedItems.triggers, Code2, 'blue')}
-                            {renderGroup('Flows', groupedItems.flows, Workflow, 'indigo')}
-                            {renderGroup('Components', groupedItems.components, Component, 'purple')}
-                            {renderGroup('Validation Rules', groupedItems.validations, ShieldCheck, 'red')}
-                        </div>
-                    )}
+
+                        {isJiraConnected ? (
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 mb-1">Project</label>
+                                        <select
+                                            className="w-full text-sm border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={selectedProject}
+                                            onChange={(e) => setSelectedProject(e.target.value)}
+                                        >
+                                            <option value="">Select Project...</option>
+                                            {jiraProjects.map(p => <option key={p.key} value={p.key}>{p.name} ({p.key})</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-500 mb-1">Story</label>
+                                        <select
+                                            className="w-full text-sm border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={selectedStoryId}
+                                            onChange={(e) => setSelectedStoryId(e.target.value)}
+                                            disabled={!selectedProject}
+                                        >
+                                            <option value="">Select Story...</option>
+                                            {jiraStories.map(s => <option key={s.id} value={s.id}>{s.key}: {s.title}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                {selectedStoryDetails && (
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                                        <p className="font-medium text-slate-800">{selectedStoryDetails.title}</p>
+                                        <p className="text-slate-500 mt-1 line-clamp-2">{selectedStoryDetails.description}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <textarea
+                                className="w-full text-sm border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+                                rows={3}
+                                placeholder="Paste Jira story or additional context here..."
+                                value={jiraStoryInput}
+                                onChange={(e) => setJiraStoryInput(e.target.value)}
+                            />
+                        )}
+                    </div>
+
+                    {/* Selected Metadata Section */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Selected Metadata</h3>
+                        {selectedItems.length === 0 ? (
+                            <div className="text-center py-8 text-slate-400">
+                                <Database size={32} className="mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">No items selected.</p>
+                                <p className="text-xs mt-1">Select components from the Metadata Explorer.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {Object.entries(groupedItems).map(([type, items]) => (
+                                    <div key={type}>
+                                        <h4 className="text-xs font-medium text-slate-400 mb-2 pl-1">{type}</h4>
+                                        <div className="space-y-2">
+                                            {items.map(item => (
+                                                <div key={item.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                                    {getIconForType(item.type as MetadataType)}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-slate-700 truncate">{item.name}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{item.lastModifiedDate}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Right Panel: Generated Content */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full">
-                    <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                        <span className="text-xs font-semibold text-slate-500 uppercase">Generative Output</span>
-                        {docContent && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">AI Generated</span>}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-h-0">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+                        <h3 className="font-medium text-slate-700 flex items-center gap-2">
+                            <FileCode size={18} className="text-blue-500" />
+                            Generated Documentation
+                        </h3>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-6 prose prose-sm max-w-none">
-                        {!docContent ? (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
-                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-2">
-                                    <FileText className="opacity-20" size={24} />
-                                </div>
-                                <p>Click "Generate Guide" or use the action buttons above.</p>
-                            </div>
+                    <div className="flex-1 p-6 overflow-y-auto prose prose-slate max-w-none">
+                        {docContent ? (
+                            <ReactMarkdown>{docContent}</ReactMarkdown>
                         ) : (
-                            <div className="whitespace-pre-wrap font-sans text-slate-700">{docContent}</div>
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                <Sparkles size={48} className="mb-4 text-slate-200" />
+                                <p>Select metadata and click Generate Guide</p>
+                                <p className="text-sm mt-2">AI will analyze dependencies and create technical docs.</p>
+                            </div>
                         )}
                     </div>
                 </div>
