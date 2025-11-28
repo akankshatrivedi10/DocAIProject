@@ -194,7 +194,7 @@ const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => 
                                         <User size={16} className="text-slate-400" />
                                         <div>
                                             <p className="text-xs text-slate-500">Name</p>
-                                            <p className="font-medium text-slate-800">{customerProfile.name}</p>
+                                            <p className="font-medium text-slate-800">{currentUser.name}</p>
                                         </div>
                                     </div>
                                     <button className="text-sm text-blue-600 hover:underline">Edit</button>
@@ -204,7 +204,7 @@ const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => 
                                         <Mail size={16} className="text-slate-400" />
                                         <div>
                                             <p className="text-xs text-slate-500">Email</p>
-                                            <p className="font-medium text-slate-800">{customerProfile.email}</p>
+                                            <p className="font-medium text-slate-800">{currentUser.email}</p>
                                         </div>
                                     </div>
                                     <button className="text-sm text-blue-600 hover:underline">Edit</button>
@@ -214,7 +214,7 @@ const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => 
                                         <Building size={16} className="text-slate-400" />
                                         <div>
                                             <p className="text-xs text-slate-500">Company</p>
-                                            <p className="font-medium text-slate-800">{customerProfile.company}</p>
+                                            <p className="font-medium text-slate-800">{customerProfile.companyName}</p>
                                         </div>
                                     </div>
                                     <button className="text-sm text-blue-600 hover:underline">Edit</button>

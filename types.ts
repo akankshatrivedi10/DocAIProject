@@ -79,6 +79,9 @@ export interface Integration {
   name: string;
   status: ConnectionStatus;
   connectedAt?: Date;
+  environment?: 'test' | 'production'; // For Jira test vs prod
+  projects?: { key: string; name: string }[]; // Loaded projects
+  selectedProjectKey?: string; // Currently selected project
 }
 
 // --- Detailed Metadata Models ---

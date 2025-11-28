@@ -354,7 +354,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 p-8 overflow-y-auto relative">
           {/* Global Context Bar */}
-          <div className="flex justify-end items-center gap-4 mb-4">
+          <div className="flex justify-end items-center gap-4 mb-6">
             {customerProfile && customerProfile.subscription.status === 'Trialing' && activeTab !== Tab.PROFILE && (
               <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab(Tab.PROFILE)}>
                 Trial Active: {Math.ceil((new Date(customerProfile.subscription.trialEndDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days Left
@@ -367,28 +367,29 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
 
-        {activeTab === Tab.DASHBOARD && <Dashboard orgs={orgs} />}
-        {activeTab === Tab.INTEGRATIONS && <Integrations
-          orgs={orgs}
-          integrations={integrations}
-          activeOrgId={activeOrgId}
-          setActiveOrgId={setActiveOrgId}
-          initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }}
-          onConnectJira={() => {
-            setIntegrations(prev => prev.map(i =>
-              i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED } : i
-            ));
-          }}
-        />}
-        {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} selectedItems={selectedMetadataItems} onSelectionChange={setSelectedMetadataItems} />}
-        {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={(story) => handleGenerateDoc('DEV', undefined, story)} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} selectedItems={resolvedSelectedItems} isJiraConnected={integrations.find(i => i.type === IntegrationType.JIRA)?.status === ConnectionStatus.CONNECTED} />}
-        {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
-        {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
-        {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}
-        {activeTab === Tab.SETTINGS && customerProfile && currentUser && <Settings customerProfile={customerProfile} currentUser={currentUser} />}
-        {activeTab === Tab.PROFILE && customerProfile && currentUser && <CustomerProfilePage profile={customerProfile} currentUser={currentUser} />}
+          {/* Tab Content */}
+          {activeTab === Tab.DASHBOARD && <Dashboard orgs={orgs} />}
+          {activeTab === Tab.INTEGRATIONS && <Integrations
+            orgs={orgs}
+            integrations={integrations}
+            activeOrgId={activeOrgId}
+            setActiveOrgId={setActiveOrgId}
+            initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }}
+            onConnectJira={(env) => {
+              setIntegrations(prev => prev.map(i =>
+                i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED, environment: env } : i
+              ));
+            }}
+          />}
+          {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} selectedItems={selectedMetadataItems} onSelectionChange={setSelectedMetadataItems} />}
+          {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={(story) => handleGenerateDoc('DEV', undefined, story)} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} selectedItems={resolvedSelectedItems} isJiraConnected={integrations.find(i => i.type === IntegrationType.JIRA)?.status === ConnectionStatus.CONNECTED} />}
+          {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+          {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+          {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}
+          {activeTab === Tab.SETTINGS && customerProfile && currentUser && <Settings customerProfile={customerProfile} currentUser={currentUser} />}
+          {activeTab === Tab.PROFILE && customerProfile && currentUser && <CustomerProfilePage profile={customerProfile} currentUser={currentUser} />}
+        </div>
       </main>
 
       {/* OAuth Modal */}
