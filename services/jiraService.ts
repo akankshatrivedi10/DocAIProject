@@ -19,7 +19,8 @@ export interface JiraProject {
 const MOCK_PROJECTS: JiraProject[] = [
     { key: 'PROJ', name: 'Core Platform' },
     { key: 'MOB', name: 'Mobile App' },
-    { key: 'API', name: 'API Gateway' }
+    { key: 'API', name: 'API Gateway' },
+    { key: 'TEST-PROJ', name: 'Mock Test Project' }
 ];
 
 const MOCK_STORIES: Record<string, JiraStory[]> = {
@@ -51,6 +52,25 @@ const MOCK_STORIES: Record<string, JiraStory[]> = {
             description: 'Update the login screen to match the new design system.',
             acceptanceCriteria: '- Use new color palette\n- Add biometric login option',
             status: 'Done'
+        }
+    ],
+    'TEST-PROJ': [
+        {
+            id: '90001',
+            key: 'TEST-101',
+            title: 'Test Jira Story for Validation',
+            description: 'This is a mock story used for testing the Jira integration features without connecting to a real instance.',
+            acceptanceCriteria: '- Verify connection is successful\n- Select this story in Dev Workspace\n- Generate documentation using this context',
+            status: 'In Progress',
+            epic: 'TEST-EPIC-1'
+        },
+        {
+            id: '90002',
+            key: 'TEST-102',
+            title: 'Another Mock Story',
+            description: 'Secondary story to test search and selection functionality.',
+            acceptanceCriteria: '- Search for "Another"\n- Verify details appear in preview',
+            status: 'To Do'
         }
     ]
 };

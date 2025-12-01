@@ -8,7 +8,7 @@ import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPages';
 import OAuthModal from './components/OAuthModal';
 import OAuthCallback from './components/OAuthCallback';
-import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User, MetadataItem, MetadataType } from './types';
+import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User, MetadataItem, MetadataType, SystemRole } from './types';
 // Switched to real service
 // Switched to real service
 import { performRealSync } from './services/realSalesforceService';
@@ -387,7 +387,17 @@ const App: React.FC = () => {
           {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
           {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
           {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}
-          {activeTab === Tab.SETTINGS && customerProfile && currentUser && <Settings customerProfile={customerProfile} currentUser={currentUser} />}
+          {activeTab === Tab.SETTINGS && customerProfile && currentUser && (
+            currentUser.systemRole === SystemRole.ADMIN ? (
+              <Settings customerProfile={customerProfile} currentUser={currentUser} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                <ShieldCheck size={48} className="mb-4 text-slate-300" />
+                <h3 className="text-lg font-semibold text-slate-700">Access Denied</h3>
+                <p>You don’t have permission to access Admin features.</p>
+              </div>
+            )
+          )}
           {activeTab === Tab.PROFILE && customerProfile && currentUser && <CustomerProfilePage profile={customerProfile} currentUser={currentUser} />}
         </div>
       </main>

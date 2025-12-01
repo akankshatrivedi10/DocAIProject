@@ -12,5 +12,10 @@ export const TEST_CREDENTIALS = {
     password: 'password123',
     name: 'Akanksha Trivedi',
     company: 'Brahmcloud'
+  },
+  jira: {
+    domain: 'mock-test.atlassian.net',
+    email: 'test-user@mock.com',
+    token: 'mock-api-token-12345'
   }
 };

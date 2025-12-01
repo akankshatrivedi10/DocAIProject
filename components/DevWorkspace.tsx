@@ -223,28 +223,29 @@ Epic: ${selectedStoryDetails.epic || 'None'}
 
                                     {/* Story Results Dropdown */}
                                     {selectedProject && storySearchQuery && !selectedStoryId && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                                             {jiraStories.length > 0 ? (
                                                 jiraStories.map(story => (
-                                                    <button
+                                                    <div
                                                         key={story.id}
-                                                        className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
-                                                        onClick={() => {
+                                                        className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors cursor-pointer"
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault(); // Prevent focus loss
                                                             setSelectedStoryId(story.id);
-                                                            setStorySearchQuery(''); // Clear search to hide dropdown
+                                                            setStorySearchQuery('');
                                                         }}
                                                     >
                                                         <div className="flex justify-between items-start mb-1">
                                                             <span className="font-semibold text-slate-700 text-sm">{story.key}</span>
                                                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${story.status === 'Done' ? 'bg-green-100 text-green-700' :
-                                                                story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                                                                    'bg-slate-100 text-slate-600'
+                                                                    story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                                                        'bg-slate-100 text-slate-600'
                                                                 }`}>
                                                                 {story.status}
                                                             </span>
                                                         </div>
                                                         <p className="text-xs text-slate-600 line-clamp-1">{story.title}</p>
-                                                    </button>
+                                                    </div>
                                                 ))
                                             ) : (
                                                 <div className="p-3 text-xs text-slate-500 text-center">No stories found</div>

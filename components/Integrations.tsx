@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, AlertCircle, RefreshCw, CheckCircle, Lock, Zap, ExternalLink } from 'lucide-react';
 import { Org, Integration, OrgType, ConnectionStatus, IntegrationType } from '../types';
 import { Button, Card, Input, Modal } from './ui';
+import { TEST_CREDENTIALS } from '../services/testCredentials';
 
 interface IntegrationsProps {
     orgs: Org[];
@@ -44,6 +45,15 @@ const Integrations: React.FC<IntegrationsProps> = ({
         } finally {
             setIsConnectingJira(false);
         }
+    };
+
+    const handleUseMockConnection = () => {
+        setJiraCreds({
+            domain: TEST_CREDENTIALS.jira.domain,
+            email: TEST_CREDENTIALS.jira.email,
+            token: TEST_CREDENTIALS.jira.token
+        });
+        setJiraEnvironment('test');
     };
 
     return (
@@ -94,14 +104,22 @@ const Integrations: React.FC<IntegrationsProps> = ({
                         onChange={e => setJiraCreds({ ...jiraCreds, token: e.target.value })}
                         error={jiraError}
                     />
-                    <div className="flex justify-end gap-3 mt-6">
-                        <Button variant="ghost" onClick={() => setShowJiraModal(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleConnectJira} isLoading={isConnectingJira}>
-                            <Zap size={16} />
-                            Connect
-                        </Button>
+                    <div className="flex justify-between items-center mt-6">
+                        <button
+                            onClick={handleUseMockConnection}
+                            className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        >
+                            Use Mock Connection
+                        </button>
+                        <div className="flex gap-3">
+                            <Button variant="ghost" onClick={() => setShowJiraModal(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleConnectJira} isLoading={isConnectingJira}>
+                                <Zap size={16} />
+                                Connect
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </Modal>

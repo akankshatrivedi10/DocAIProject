@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, CreditCard, TrendingUp, Database, FileText, Zap, Calendar, DollarSign, User, Mail, Building, UserPlus, Trash2, Shield } from 'lucide-react';
-import { CustomerProfile, SystemRole, User as UserType } from '../types';
+import { Settings as SettingsIcon, CreditCard, TrendingUp, Database, FileText, Zap, Calendar, DollarSign, User, Mail, Building, UserPlus, Trash2, Shield, Lock, Globe, Save } from 'lucide-react';
+import { CustomerProfile, SystemRole, User as UserType, UserRole } from '../types';
+import { Button, Input, Modal } from './ui';
 
 interface SettingsProps {
     customerProfile: CustomerProfile;
@@ -8,9 +9,27 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => {
-    const [activeTab, setActiveTab] = useState<'usage' | 'billing' | 'account' | 'users'>('usage');
+    const [activeTab, setActiveTab] = useState<'usage' | 'billing' | 'account' | 'users' | 'org_settings'>('usage');
     const [showAddUserModal, setShowAddUserModal] = useState(false);
+    const [newUser, setNewUser] = useState({ name: '', email: '', role: 'Developer' });
+    const [orgSettings, setOrgSettings] = useState({
+        enforce2FA: true,
+        sessionTimeout: '30',
+        defaultExportFormat: 'PDF',
+        allowedDomains: 'example.com'
+    });
     const isAdmin = currentUser.systemRole === SystemRole.ADMIN;
+
+    const handleAddUser = () => {
+        // Mock add user logic
+        setShowAddUserModal(false);
+        setNewUser({ name: '', email: '', role: 'Developer' });
+        alert('User invited successfully!');
+    };
+
+    const handleSaveOrgSettings = () => {
+        alert('Organization settings saved successfully!');
+    };
 
     // Calculate usage percentages
     const apiUsagePercent = (customerProfile.usage.apiCallsThisMonth / customerProfile.limits.maxApiCalls) * 100;
@@ -20,7 +39,44 @@ const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => 
     return (
         <div className="h-full flex flex-col">
             {/* ... */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex border-b border-slate-200 px-6 bg-white">
+                <button
+                    onClick={() => setActiveTab('usage')}
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'usage' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    Usage & Limits
+                </button>
+                <button
+                    onClick={() => setActiveTab('billing')}
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'billing' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    Billing
+                </button>
+                <button
+                    onClick={() => setActiveTab('account')}
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'account' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    Account
+                </button>
+                {isAdmin && (
+                    <>
+                        <button
+                            onClick={() => setActiveTab('users')}
+                            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'users' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Users
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('org_settings')}
+                            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'org_settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Org Settings
+                        </button>
+                    </>
+                )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
                 {activeTab === 'usage' && (
                     <div className="space-y-6">
                         {/* ... */}
@@ -311,12 +367,19 @@ const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => 
                                                 {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                {user.id !== currentUser.id && (
-                                                    <button className="text-red-600 hover:text-red-800 flex items-center gap-1 ml-auto">
-                                                        <Trash2 size={14} />
-                                                        Remove
-                                                    </button>
-                                                )}
+                                                <div className="flex justify-end gap-2">
+                                                    <button className="text-blue-600 hover:text-blue-800">Edit</button>
+                                                    {user.status === 'Active' ? (
+                                                        <button className="text-amber-600 hover:text-amber-800">Deactivate</button>
+                                                    ) : (
+                                                        <button className="text-green-600 hover:text-green-800">Activate</button>
+                                                    )}
+                                                    {user.id !== currentUser.id && (
+                                                        <button className="text-red-600 hover:text-red-800 flex items-center gap-1">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -345,7 +408,122 @@ const Settings: React.FC<SettingsProps> = ({ customerProfile, currentUser }) => 
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'org_settings' && isAdmin && (
+                    <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                            <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                <Shield size={18} />
+                                Security Settings
+                            </h3>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                                    <div>
+                                        <p className="font-medium text-slate-800">Enforce Two-Factor Authentication</p>
+                                        <p className="text-xs text-slate-500">Require 2FA for all users in the organization</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" checked={orgSettings.enforce2FA} onChange={e => setOrgSettings({ ...orgSettings, enforce2FA: e.target.checked })} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                                    <div>
+                                        <p className="font-medium text-slate-800">Session Timeout</p>
+                                        <p className="text-xs text-slate-500">Automatically log out inactive users</p>
+                                    </div>
+                                    <select
+                                        value={orgSettings.sessionTimeout}
+                                        onChange={e => setOrgSettings({ ...orgSettings, sessionTimeout: e.target.value })}
+                                        className="text-sm border-slate-200 rounded-lg p-2"
+                                    >
+                                        <option value="15">15 Minutes</option>
+                                        <option value="30">30 Minutes</option>
+                                        <option value="60">1 Hour</option>
+                                        <option value="240">4 Hours</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                            <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                <Globe size={18} />
+                                General Configuration
+                            </h3>
+                            <div className="space-y-4">
+                                <Input
+                                    label="Allowed Email Domains"
+                                    value={orgSettings.allowedDomains}
+                                    onChange={(e: any) => setOrgSettings({ ...orgSettings, allowedDomains: e.target.value })}
+                                    placeholder="e.g. company.com, subsidiary.com"
+                                />
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Default Export Format</label>
+                                    <div className="flex gap-4">
+                                        {['PDF', 'Markdown', 'HTML'].map(fmt => (
+                                            <label key={fmt} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="exportFormat"
+                                                    checked={orgSettings.defaultExportFormat === fmt}
+                                                    onChange={() => setOrgSettings({ ...orgSettings, defaultExportFormat: fmt })}
+                                                    className="text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm text-slate-700">{fmt}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <Button onClick={handleSaveOrgSettings}>
+                                <Save size={16} />
+                                Save Changes
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            <Modal isOpen={showAddUserModal} onClose={() => setShowAddUserModal(false)} title="Invite New User">
+                <div className="space-y-4">
+                    <Input
+                        label="Full Name"
+                        value={newUser.name}
+                        onChange={(e: any) => setNewUser({ ...newUser, name: e.target.value })}
+                        placeholder="John Doe"
+                    />
+                    <Input
+                        label="Email Address"
+                        type="email"
+                        value={newUser.email}
+                        onChange={(e: any) => setNewUser({ ...newUser, email: e.target.value })}
+                        placeholder="john@company.com"
+                    />
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
+                        <select
+                            className="w-full border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={newUser.role}
+                            onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                        >
+                            <option value="Developer">Developer</option>
+                            <option value="Business Analyst">Business Analyst</option>
+                            <option value="GTM Lead">GTM Lead</option>
+                            <option value="Sales">Sales</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-3 mt-6">
+                        <Button variant="ghost" onClick={() => setShowAddUserModal(false)}>Cancel</Button>
+                        <Button onClick={handleAddUser}>Send Invitation</Button>
+                    </div>
+                </div>
+            </Modal>
+
         </div>
     );
 };

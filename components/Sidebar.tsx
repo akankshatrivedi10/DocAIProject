@@ -9,7 +9,8 @@ import {
   GraduationCap,
   MessageSquareCode,
   Settings,
-  Sparkles
+  Sparkles,
+  User as UserIcon
 } from 'lucide-react';
 import { Tab, User, SystemRole } from '../types';
 
@@ -63,8 +64,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser 
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 relative overflow-hidden group ${isActive
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/50'
-                  : 'hover:bg-slate-800/60 hover:text-white text-slate-400'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/50'
+                : 'hover:bg-slate-800/60 hover:text-white text-slate-400'
                 }`}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -94,34 +95,34 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser 
           );
         })}
 
-        <div className="pt-4 mt-4 border-t border-slate-800/50">
-          {currentUser?.systemRole === SystemRole.ADMIN ? (
+        <div className="pt-4 mt-4 border-t border-slate-800/50 space-y-1.5">
+          {currentUser?.systemRole === SystemRole.ADMIN && (
             <motion.button
               onClick={() => setActiveTab(Tab.SETTINGS)}
               className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${activeTab === Tab.SETTINGS
-                  ? 'bg-slate-800 text-white'
-                  : 'hover:bg-slate-800/60 hover:text-white text-slate-400'
+                ? 'bg-slate-800 text-white'
+                : 'hover:bg-slate-800/60 hover:text-white text-slate-400'
                 }`}
               whileHover={{ x: 4 }}
               whileTap={{ scale: 0.98 }}
             >
               <Settings size={18} />
-              Settings & Billing
-            </motion.button>
-          ) : (
-            <motion.button
-              onClick={() => setActiveTab(Tab.PROFILE)}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${activeTab === Tab.PROFILE
-                  ? 'bg-slate-800 text-white'
-                  : 'hover:bg-slate-800/60 hover:text-white text-slate-400'
-                }`}
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Settings size={18} />
-              My Profile
+              Organization Settings
             </motion.button>
           )}
+
+          <motion.button
+            onClick={() => setActiveTab(Tab.PROFILE)}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${activeTab === Tab.PROFILE
+              ? 'bg-slate-800 text-white'
+              : 'hover:bg-slate-800/60 hover:text-white text-slate-400'
+              }`}
+            whileHover={{ x: 4 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <UserIcon size={18} />
+            My Profile
+          </motion.button>
         </div>
       </nav>
 
