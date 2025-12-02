@@ -53,9 +53,44 @@ export const login = async (email: string, password?: string): Promise<{ user: U
 
   // Mock profile data
   const profile = {
-    userId: user.id,
-    preferences: {},
-    settings: {}
+    id: `profile-${user.organizationId}`,
+    companyName: user.organizationId === 'org-brahmcloud' ? 'Brahmcloud' : 'Acme Corp',
+    industry: 'Technology',
+    domain: user.email.split('@')[1],
+    subscription: {
+      plan: 'Pro',
+      status: 'Active',
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      seatsTotal: 10,
+      seatsUsed: 4
+    },
+    users: USERS.filter(u => u.organizationId === user.organizationId),
+    transactions: [
+      {
+        id: 'tx-101',
+        date: new Date('2025-11-01'),
+        amount: 99.00,
+        currency: 'USD',
+        description: 'Pro Plan - Monthly',
+        status: 'Paid',
+        invoiceUrl: '#'
+      }
+    ],
+    usage: {
+      connectedOrgs: 1,
+      metadataItemsAnalyzed: 1250,
+      documentsGenerated: 45,
+      storageUsedMB: 120,
+      apiCallsThisMonth: 8500
+    },
+    limits: {
+      maxConnectedOrgs: 5,
+      maxMetadataItems: 10000,
+      maxDocuments: 100,
+      maxStorageMB: 1024,
+      maxApiCalls: 100000
+    }
   };
 
   return { user, profile };
@@ -86,10 +121,36 @@ export const signup = async (
 
   // Mock profile data
   const profile = {
-    userId: newUser.id,
-    preferences: {},
-    settings: {},
-    companyName: companyName
+    id: `profile-${newUser.organizationId}`,
+    companyName: companyName,
+    industry: 'Technology',
+    domain: email.split('@')[1],
+    subscription: {
+      plan: 'Free',
+      status: 'Trialing',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      trialStartDate: new Date(),
+      trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
+      seatsTotal: 5,
+      seatsUsed: 1
+    },
+    users: [newUser],
+    transactions: [],
+    usage: {
+      connectedOrgs: 0,
+      metadataItemsAnalyzed: 0,
+      documentsGenerated: 0,
+      storageUsedMB: 0,
+      apiCallsThisMonth: 0
+    },
+    limits: {
+      maxConnectedOrgs: 1,
+      maxMetadataItems: 1000,
+      maxDocuments: 10,
+      maxStorageMB: 100,
+      maxApiCalls: 1000
+    }
   };
 
   console.log(`New user signed up: ${email} for ${companyName}`);

@@ -132,12 +132,14 @@ const App: React.FC = () => {
     setIsLoading(true);
     setLoginError('');
     try {
-      const { user } = await login(email, password);
+      const { user, profile } = await login(email, password);
       console.log("Login successful:", user);
       setCurrentUser(user);
+      setCustomerProfile(profile);
 
       // Persist session
       localStorage.setItem('docai_user', JSON.stringify(user));
+      localStorage.setItem('docai_profile', JSON.stringify(profile));
 
       setAuthView('APP');
     } catch (err: any) {
