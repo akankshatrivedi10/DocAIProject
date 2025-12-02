@@ -44,13 +44,57 @@ const USERS: User[] = [
   }
 ];
 
-export const login = async (email: string): Promise<User> => {
+export const login = async (email: string, password?: string): Promise<{ user: User; profile: any }> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   const user = USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (!user) {
     throw new Error('User not found');
   }
-  return user;
+
+  // Mock profile data
+  const profile = {
+    userId: user.id,
+    preferences: {},
+    settings: {}
+  };
+
+  return { user, profile };
+};
+
+export const signup = async (
+  fullName: string,
+  companyName: string,
+  email: string,
+  password: string
+): Promise<{ user: User; profile: any }> => {
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  // Create a new customer user
+  const newUser: User = {
+    id: `user-${Date.now()}`,
+    name: fullName,
+    email: email.toLowerCase(),
+    role: UserRole.ADMIN,
+    systemRole: SystemRole.ADMIN,
+    organizationId: `org-${companyName.toLowerCase().replace(/\s+/g, '-')}`,
+    tenantId: `tenant-${Date.now()}`,
+    status: 'Active'
+  };
+
+  // Add to USERS array (in real app, this would go to database)
+  USERS.push(newUser);
+
+  // Mock profile data
+  const profile = {
+    userId: newUser.id,
+    preferences: {},
+    settings: {},
+    companyName: companyName
+  };
+
+  console.log(`New user signed up: ${email} for ${companyName}`);
+
+  return { user: newUser, profile };
 };
 
 export const register = async (name: string, email: string, companyName: string): Promise<void> => {

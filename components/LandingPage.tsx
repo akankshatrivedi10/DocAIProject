@@ -603,7 +603,43 @@ const LandingPage: React.FC<LandingPageProps> = ({ setView }) => {
             <a href="#" className="hover:text-white">Terms of Service</a>
           </div>
         </div>
+
+        {/* Environment Selector (Dev Only) */}
+        <div className="max-w-7xl mx-auto px-4 pt-4 border-t border-slate-800 text-xs text-slate-500 flex justify-end">
+          <EnvironmentSelector />
+        </div>
       </footer>
+    </div>
+  );
+};
+
+// Environment Selector Component
+import { ENV_CONFIG, getStoredEnvironment, setStoredEnvironment, EnvironmentMode } from '../config/envConfig';
+
+const EnvironmentSelector = () => {
+  const [currentEnv, setCurrentEnv] = useState<EnvironmentMode>(getStoredEnvironment());
+
+  const handleEnvChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newEnv = e.target.value as EnvironmentMode;
+    setStoredEnvironment(newEnv);
+    setCurrentEnv(newEnv);
+  };
+
+  return (
+    <div className="flex items-center gap-2 bg-slate-900 p-2 rounded border border-slate-800">
+      <span className="font-mono text-slate-400">DEV ENV:</span>
+      <select
+        value={currentEnv}
+        onChange={handleEnvChange}
+        className="bg-slate-950 text-slate-300 border border-slate-700 rounded px-2 py-1 outline-none focus:border-blue-500"
+      >
+        {Object.entries(ENV_CONFIG).map(([key, config]) => (
+          <option key={key} value={key}>
+            {config.label}
+          </option>
+        ))}
+      </select>
+      <div className={`w-2 h-2 rounded-full ${currentEnv === 'LOCALHOST' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
     </div>
   );
 };

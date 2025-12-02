@@ -1,48 +1,297 @@
-
 import { MetadataSummary, SyncStage, ObjectDef, FlowDef, ApexClassDef, ValidationRuleDef, ApexTriggerDef, ComponentDef, ProfileDef, SharingRuleDef } from '../types';
+import { TEST_CREDENTIALS } from './testCredentials';
 
 // Declare jsforce global since it's loaded via script tag
 declare var jsforce: any;
 
-const PROXY_URL = 'http://localhost:8080/';
+// ============================================================================
+// 🎯 REQUIREMENT #6: Persistent Storage Interfaces
+// ============================================================================
 
-export const exchangeCodeForToken = async (code: string, clientId: string, clientSecret: string): Promise<{ access_token: string, instance_url: string, refresh_token: string }> => {
-    const codeVerifier = sessionStorage.getItem('pkce_code_verifier');
+export interface SalesforceConnection {
+    id: string;
+    org_id: string;
+    salesforce_org_id: string;
+    instance_url: string;
+    access_token: string;
+    refresh_token: string;
+    issued_at: number;
+    expires_in: number; // Seconds
+}
 
-    const params = new URLSearchParams();
-    params.append('grant_type', 'authorization_code');
-    params.append('client_id', clientId);
-    params.append('client_secret', clientSecret);
-    params.append('redirect_uri', 'http://localhost:3000/oauth/callback');
-    params.append('code', code);
+// ============================================================================
+// 🎯 REQUIREMENT #1 & #3: Environment & Configuration
+// ============================================================================
 
-    // Include PKCE code verifier
-    if (codeVerifier) {
-        params.append('code_verifier', codeVerifier);
+/**
+ * Detects whether the app is running locally or in production (client-side)
+ */
+const detectLocalEnvironment = (): boolean => {
+    try {
+        if (typeof window !== 'undefined' && window.location) {
+            const host = window.location.host || '';
+            return host.includes('localhost') || host.startsWith('127.0.0.1');
+        }
+    } catch (e) {
+        // ignore
+    }
+    return false;
+};
+
+import { getStoredEnvironment, ENV_CONFIG } from '../config/envConfig';
+
+/**
+ * Gets the runtime environment configuration
+ *
+ * Important changes:
+ * - API_URL is the server-side route for token exchange and MUST NOT go through proxy.
+ * - If running in browser, API_URL resolves to `${window.location.origin}/api/salesforce/exchangeToken`
+ *   which maps to your Next.js serverless endpoint in both local & Vercel.
+ * - PROXY_URL may be used for direct Salesforce API calls from the browser (jsforce) in local dev,
+ *   but token exchange is always server-side and direct.
+ */
+const getEnvironmentConfig = (forceEnv?: 'local' | 'prod') => {
+    // Check stored preference first
+    const storedEnv = getStoredEnvironment(); // e.g., 'LOCALHOST' or 'PROD'
+
+    // Determine mode: forceEnv > storedEnv > detection
+    let isLocal: boolean;
+    if (forceEnv) {
+        isLocal = forceEnv === 'local';
+    } else if (storedEnv) {
+        isLocal = storedEnv.toUpperCase() === 'LOCALHOST';
+    } else {
+        isLocal = detectLocalEnvironment();
     }
 
-    // Use local proxy to bypass CORS on token endpoint
-    const tokenUrl = PROXY_URL + 'https://test.salesforce.com/services/oauth2/token';
+    const envMode: 'local' | 'prod' = isLocal ? 'local' : 'prod';
+    // pick config: LOCALHOST config expected to contain apiUrl and redirectUri
+    const config = isLocal ? ENV_CONFIG.LOCALHOST : ENV_CONFIG.TEST_SERVER;
 
-    console.log('[exchangeCodeForToken] Sending request to:', tokenUrl);
-    console.log('[exchangeCodeForToken] Params:', params.toString());
+    // 🎯 REQUIREMENT #3: Environment-Aware Redirect
+    const REDIRECT_URI = config.redirectUri;
 
-    const response = await fetch(tokenUrl, {
+    // 🎯 REQUIREMENT #5: Proxy only in local mode (optional)
+    const PROXY_URL = isLocal && config.apiUrl ? config.apiUrl.replace(/\/+$/, '') : '';
+
+    // 🎯 REQUIREMENT #4: Server-Side Token Exchange Route (must not go through proxy)
+    // If client-side (browser) environment, use window.location.origin so fetch('/api/...') resolves correctly.
+    const API_URL = (typeof window !== 'undefined')
+        ? `${window.location.origin}/api/salesforce/exchangeToken`
+        : '/api/salesforce/exchangeToken'; // server-side fallback
+
+    return {
+        envMode,
+        isLocal,
+        REDIRECT_URI,
+        PROXY_URL,
+        API_URL
+    };
+};
+
+// ============================================================================
+// 🎯 REQUIREMENT #2: Multi-Tenant OAuth2 Web Server Flow (with PKCE)
+// ============================================================================
+
+/**
+ * Generates a random PKCE code verifier
+ */
+export const generateCodeVerifier = (): string => {
+    const array = new Uint8Array(32);
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(array);
+    } else {
+        // fallback (not cryptographically strong) -- only for non-browser tests
+        for (let i = 0; i < array.length; i++) array[i] = Math.floor(Math.random() * 256);
+    }
+    return Array.from(array, (b) => ('0' + b.toString(16)).slice(-2)).join('');
+};
+
+/**
+ * Generates a PKCE code challenge from the verifier
+ */
+export const generateCodeChallenge = async (verifier: string): Promise<string> => {
+    if (typeof window === 'undefined' || !window.crypto?.subtle) {
+        // fallback naive base64 for non-browser tests
+        return btoa(verifier).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await window.crypto.subtle.digest('SHA-256', data);
+
+    // Base64Url encode
+    const bytes = new Uint8Array(hash);
+    let binary = '';
+    bytes.forEach((b) => (binary += String.fromCharCode(b)));
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+/**
+ * Generates the Salesforce Authorization URL for the centralized Connected App
+ */
+export const getAuthorizationUrl = (codeChallenge?: string, forceEnv?: 'local' | 'prod'): string => {
+    const { REDIRECT_URI } = getEnvironmentConfig(forceEnv);
+
+    // 🎯 REQUIREMENT #1: Use Central Connected App (Client ID from test credentials)
+    const CLIENT_ID = TEST_CREDENTIALS.salesforce.consumerKey;
+    const LOGIN_URL = 'https://login.salesforce.com'; // Default to prod login. UI can override for sandbox.
+
+    const params = new URLSearchParams();
+    params.append('response_type', 'code');
+    params.append('client_id', CLIENT_ID);
+    params.append('redirect_uri', REDIRECT_URI);
+    params.append('scope', 'api refresh_token openid'); // include openid for id token when needed
+    params.append('prompt', 'login consent');
+
+    if (codeChallenge) {
+        params.append('code_challenge', codeChallenge);
+        params.append('code_challenge_method', 'S256');
+    }
+
+    return `${LOGIN_URL}/services/oauth2/authorize?${params.toString()}`;
+};
+
+/**
+ * Exchanges OAuth code for tokens using the Server-Side API Route
+ * 🎯 REQUIREMENT #4: Never expose client_secret to browser
+ *
+ * Important:
+ * - This function POSTS to your server-side endpoint (API_URL). API_URL must be reachable without proxy.
+ * - The server endpoint must perform the actual call to Salesforce token endpoint directly.
+ */
+export const exchangeCodeForToken = async (
+    code: string,
+    isSandbox: boolean = false,
+    forceEnv?: 'local' | 'prod'
+): Promise<SalesforceConnection> => {
+
+    const { API_URL, REDIRECT_URI, envMode } = getEnvironmentConfig(forceEnv);
+
+    // Retrieve PKCE verifier if available
+    const codeVerifier = (typeof sessionStorage !== 'undefined')
+        ? sessionStorage.getItem('pkce_code_verifier')
+        : null;
+
+    console.log(`[OAuth] Exchanging code via ${envMode} API:`, API_URL);
+
+    // Ensure we call our server route directly (do NOT use proxy here).
+    const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': 'http://localhost:3000'
+            'Content-Type': 'application/json'
         },
-        body: params
+        body: JSON.stringify({
+            code,
+            redirect_uri: REDIRECT_URI,
+            code_verifier: codeVerifier,
+            is_sandbox: isSandbox // server decides login vs test endpoint
+        })
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[exchangeCodeForToken] Error Response:', errorText);
+        const errorText = await response.text().catch(() => '<no body>');
+        console.error('[OAuth] Token Exchange Failed:', response.status, response.statusText, errorText);
         throw new Error(`Token Exchange Failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    // Map response to SalesforceConnection interface
+    const connection: SalesforceConnection = {
+        id: data.id || `conn_${Date.now()}`,
+        org_id: data.organization_id || (data.id ? data.id.split('/')[4] : 'unknown'),
+        salesforce_org_id: data.organization_id || (data.id ? data.id.split('/')[4] : 'unknown'),
+        instance_url: data.instance_url,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        issued_at: data.issued_at ? parseInt(data.issued_at, 10) : Date.now(),
+        expires_in: data.expires_in || 7200
+    };
+
+    // 🎯 REQUIREMENT #6: Save connection
+    try {
+        saveSalesforceConnection(connection);
+    } catch (e) {
+        console.warn('[OAuth] Failed to persist connection locally:', e);
+    }
+
+    // Clean up PKCE verifier
+    if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('pkce_code_verifier');
+    }
+
+    return connection;
+};
+
+// ============================================================================
+// 🎯 REQUIREMENT #6: Helper Functions
+// ============================================================================
+
+const STORAGE_KEY = 'docbot_sf_connections';
+
+export const saveSalesforceConnection = (connection: SalesforceConnection) => {
+    if (typeof window === 'undefined') return;
+
+    // Get existing connections
+    const connections = getSalesforceConnections();
+
+    // Update or add
+    const index = connections.findIndex(c => c.salesforce_org_id === connection.salesforce_org_id);
+    if (index >= 0) {
+        connections[index] = connection;
+    } else {
+        connections.push(connection);
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
+    // Also save as 'active' connection for backward compatibility
+    localStorage.setItem('sf_access_token', connection.access_token);
+    localStorage.setItem('sf_instance_url', connection.instance_url);
+    if (connection.refresh_token) {
+        localStorage.setItem('sf_refresh_token', connection.refresh_token);
+    }
+};
+
+export const getSalesforceConnections = (): SalesforceConnection[] => {
+    if (typeof window === 'undefined') return [];
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+};
+
+export const getSalesforceConnectionByOrg = (orgId: string): SalesforceConnection | undefined => {
+    const connections = getSalesforceConnections();
+    return connections.find(c => c.salesforce_org_id === orgId);
+};
+
+// ============================================================================
+// 🎯 REQUIREMENT #5: Updated performRealSync
+// ============================================================================
+
+/**
+ * Helper: safely construct proxied instance URL for local proxies.
+ *
+ * Some CORS proxies accept a path like: http://localhost:8080/<target-host>/<path>
+ * Others expect: http://localhost:8080/https://target/...
+ * There is no universal format — ensure your local proxy supports the pattern below.
+ *
+ * This function attempts a safe approach:
+ * - Strip protocol from instanceUrl
+ * - Join proxy + stripped host/path with a single slash
+ *
+ * Example:
+ * - instanceUrl = "https://na123.salesforce.com"
+ * - returns "http://localhost:8080/na123.salesforce.com"
+ *
+ * NOTE: If your proxy expects the full URL after the slash (e.g. /https://...), adapt the proxy or this function.
+ */
+const buildProxiedInstanceUrl = (proxyBase: string, instanceUrl: string) => {
+    if (!proxyBase) return instanceUrl;
+    // Remove trailing slash from proxyBase
+    const proxy = proxyBase.replace(/\/+$/, '');
+    // Strip protocol from instance url
+    const stripped = instanceUrl.replace(/^https?:\/\//, '');
+    // Join safely
+    return `${proxy}/${stripped}`;
 };
 
 export const performRealSync = async (
@@ -50,35 +299,29 @@ export const performRealSync = async (
     instanceUrl: string,
     onProgress: (stage: SyncStage, progress: number, log: string) => void,
     refreshToken?: string,
-    clientId?: string,
-    clientSecret?: string,
-    onTokenRefreshed?: (newAccessToken: string) => void
+    onTokenRefreshed?: (newAccessToken: string) => void,
+    forceEnv?: 'local' | 'prod'
 ): Promise<MetadataSummary> => {
 
-    // 1. Initialize Connection
-    onProgress(SyncStage.INIT, 5, "Initializing JSForce Connection with Access Token...");
+    const { PROXY_URL, envMode } = getEnvironmentConfig(forceEnv);
 
-    // Determine Connection Mode: OAuth2 or Standard SOAP
-    let conn;
+    onProgress(SyncStage.INIT, 5, `[${envMode.toUpperCase()}] Initializing JSForce Connection...`);
 
-    // Manually prepend proxy to instance URL to ensure all requests go through it correctly
-    // This avoids issues where jsforce's proxyUrl config doesn't construct the URL as expected for cors-anywhere
-    const proxiedInstanceUrl = PROXY_URL + instanceUrl;
+    // 🎯 REQUIREMENT #5: Support proxy only in local mode and build it safely
+    const proxiedInstanceUrl = PROXY_URL
+        ? buildProxiedInstanceUrl(PROXY_URL, instanceUrl)
+        : instanceUrl;
 
-    conn = new jsforce.Connection({
+    console.log(`[Sync] Using instance URL: ${proxiedInstanceUrl}`);
+
+    const conn = new jsforce.Connection({
         instanceUrl: proxiedInstanceUrl,
         accessToken: accessToken,
-        refreshToken: refreshToken,
-        version: '57.0', // Enforce newer API version for FlowDefinitionView
-        oauth2: (clientId && clientSecret) ? {
-            clientId: clientId,
-            clientSecret: clientSecret,
-            redirectUri: 'http://localhost:3000/oauth/callback'
-        } : undefined
-        // proxyUrl: PROXY_URL // Removed to rely on manual prefixing
+        version: '57.0',
+        // Do not set proxyUrl here to avoid double-prefixing; we control the instanceUrl above.
+        proxyUrl: undefined
     });
 
-    // Auto-refresh support
     if (onTokenRefreshed) {
         conn.on("refresh", (newAccessToken: string) => {
             console.log("[Token Refresh] New Access Token:", newAccessToken);
@@ -86,18 +329,14 @@ export const performRealSync = async (
         });
     }
 
-    // Explicitly set instance URL to proxied version
-    conn.instanceUrl = proxiedInstanceUrl;
-
     try {
         // 2. Verify Identity
         onProgress(SyncStage.INIT, 10, `Verifying identity...`);
         const identity = await conn.identity();
-        onProgress(SyncStage.INIT, 15, `Authenticated as ${identity.username}. Session established.`);
+        onProgress(SyncStage.INIT, 15, `Authenticated as ${identity.username}.`);
     } catch (err: any) {
         console.warn("Identity Check Failed", err);
-        onProgress(SyncStage.INIT, 15, `Identity check skipped: ${err.message}. Proceeding with token...`);
-        // Do not throw, proceed to describeGlobal
+        onProgress(SyncStage.INIT, 15, `Identity check skipped. Proceeding...`);
     }
 
     // 3. Fetch Objects (Standard & Custom)
@@ -105,18 +344,15 @@ export const performRealSync = async (
     let globalDescribe;
     try {
         globalDescribe = await conn.describeGlobal();
-        console.log('[performRealSync] describeGlobal result:', globalDescribe);
     } catch (e: any) {
         throw new Error(`Failed to describe global: ${e.message}`);
     }
 
     if (!globalDescribe || !globalDescribe.sobjects) {
-        console.error('[performRealSync] Invalid describeGlobal response', globalDescribe);
-        throw new Error("Failed to retrieve SObject list from Salesforce. Check console logs for details.");
+        throw new Error("Failed to retrieve SObject list.");
     }
 
-    const objectsToFetch = ['Account', 'Opportunity', 'Contact', 'Lead', 'Case']; // Start with core
-    // Add some custom objects if found
+    const objectsToFetch = ['Account', 'Opportunity', 'Contact', 'Lead', 'Case'];
     const customObjects = globalDescribe.sobjects.filter((o: any) => o.custom).slice(0, 5).map((o: any) => o.name);
     const targetObjects = [...objectsToFetch, ...customObjects];
 
@@ -153,7 +389,7 @@ export const performRealSync = async (
                     .filter((f: any) => f.type === 'reference')
                     .map((f: any) => ({
                         name: f.relationshipName,
-                        type: 'Lookup', // Simplified
+                        type: 'Lookup',
                         relatedTo: f.referenceTo?.[0]
                     }))
             });
@@ -162,10 +398,9 @@ export const performRealSync = async (
         }
     }
 
-    // 4. Fetch Apex Classes (Tooling API)
-    onProgress(SyncStage.APEX, 40, "Querying Apex Classes via Tooling API...");
+    // 4. Fetch Apex Classes
+    onProgress(SyncStage.APEX, 40, "Querying Apex Classes...");
     const apexRes = await conn.tooling.query("SELECT Id, Name, Body, ApiVersion, Status FROM ApexClass WHERE NamespacePrefix = null LIMIT 50");
-
     const apexClasses: ApexClassDef[] = apexRes.records.map((r: any) => ({
         name: r.Name,
         type: 'Class',
@@ -174,29 +409,23 @@ export const performRealSync = async (
         body: r.Body,
         description: 'Fetched from Salesforce Tooling API'
     }));
-    onProgress(SyncStage.APEX, 45, `Retrieved ${apexClasses.length} Apex Classes.`);
 
     // 5. Fetch Triggers
     onProgress(SyncStage.APEX, 50, "Querying Apex Triggers...");
     const triggerRes = await conn.tooling.query("SELECT Id, Name, TableEnumOrId, Body, Status FROM ApexTrigger WHERE NamespacePrefix = null LIMIT 50");
-
     const triggers: ApexTriggerDef[] = triggerRes.records.map((r: any) => ({
         name: r.Name,
         object: r.TableEnumOrId,
-        events: ['(Unknown - requires parsing)'],
+        events: ['(Unknown)'],
         body: r.Body,
         status: r.Status
     }));
-    onProgress(SyncStage.APEX, 55, `Retrieved ${triggers.length} Apex Triggers.`);
 
     // 6. Fetch Flows
-    onProgress(SyncStage.FLOWS, 60, "Querying Flow Definitions...");
+    onProgress(SyncStage.FLOWS, 60, "Querying Flows...");
     const flows: FlowDef[] = [];
     try {
-        // Using FlowDefinitionView (available in v45.0+)
-        // Note: Use 'Label' instead of 'MasterLabel' for FlowDefinitionView
         const flowRes = await conn.query("SELECT Id, Label, ProcessType, Description, IsActive FROM FlowDefinitionView WHERE IsActive = true LIMIT 20");
-
         flowRes.records.forEach((r: any) => {
             flows.push({
                 name: r.Label.replace(/\s+/g, '_'),
@@ -207,16 +436,13 @@ export const performRealSync = async (
                 nodes: []
             });
         });
-        onProgress(SyncStage.FLOWS, 70, `Retrieved ${flows.length} Flows.`);
-    } catch (e: any) {
-        console.warn("Flow sync failed", e);
-        onProgress(SyncStage.FLOWS, 70, `Flow sync skipped: ${e.message}`);
+    } catch (e) {
+        console.warn("Flow sync skipped");
     }
 
-    // 7. Fetch Validation Rules
+    // 7. Validation Rules
     onProgress(SyncStage.CONFIG, 75, "Querying Validation Rules...");
-    const valRes = await conn.tooling.query("SELECT Id, ValidationName, EntityDefinition.DeveloperName, ErrorMessage, ErrorDisplayField FROM ValidationRule WHERE NamespacePrefix = null LIMIT 50");
-
+    const valRes = await conn.tooling.query("SELECT Id, ValidationName, EntityDefinition.DeveloperName, ErrorMessage FROM ValidationRule WHERE NamespacePrefix = null LIMIT 50");
     const validationRules: ValidationRuleDef[] = valRes.records.map((r: any) => ({
         name: r.ValidationName,
         object: r.EntityDefinition?.DeveloperName || 'Unknown',
@@ -224,19 +450,16 @@ export const performRealSync = async (
         errorCondition: "Fetched from Tooling API",
         errorMessage: r.ErrorMessage
     }));
-    onProgress(SyncStage.CONFIG, 80, `Retrieved ${validationRules.length} Validation Rules.`);
 
-    // 8. Components (LWC/Aura)
-    onProgress(SyncStage.COMPONENTS, 85, "Scanning Lightning Components...");
+    // 8. Components
+    onProgress(SyncStage.COMPONENTS, 85, "Scanning Components...");
     const lwcRes = await conn.tooling.query("SELECT Id, DeveloperName, Description, ApiVersion FROM LightningComponentBundle LIMIT 20");
-
     const components: ComponentDef[] = lwcRes.records.map((r: any) => ({
         name: r.DeveloperName,
         type: 'LWC',
         apiVersion: r.ApiVersion,
         description: r.Description
     }));
-    onProgress(SyncStage.COMPONENTS, 90, `Retrieved ${components.length} Lightning Components.`);
 
     // 9. Profiles
     onProgress(SyncStage.CONFIG, 95, "Fetching Profiles...");
@@ -246,24 +469,19 @@ export const performRealSync = async (
         userLicense: r.UserType,
         custom: r.UserType === 'Custom'
     }));
-    onProgress(SyncStage.CONFIG, 98, `Retrieved ${profiles.length} Profiles.`);
 
-    onProgress(SyncStage.COMPLETE, 100, "Sync Complete. Index Built.");
+    onProgress(SyncStage.COMPLETE, 100, "Sync Complete.");
 
-    const fullPayload: MetadataSummary = {
+    return {
         objects: fetchedObjects,
-        apexClasses: apexClasses,
-        triggers: triggers,
-        flows: flows,
-        validationRules: validationRules,
-        components: components,
-        profiles: profiles,
-        sharingRules: [], // Sharing rules require Metadata API retrieve call (zip file), skipping for light sync
+        apexClasses,
+        triggers,
+        flows,
+        validationRules,
+        components,
+        profiles,
+        sharingRules: [],
         permissions: 100,
         fetchedAt: new Date()
     };
-
-    // fullPayload.details = fullPayload; // REMOVED: Causes circular reference error in JSON.stringify
-
-    return fullPayload;
 };

@@ -1,4 +1,5 @@
 
+import { Routes, Route } from "react-router-dom";
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
@@ -131,7 +132,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setLoginError('');
     try {
-      const user = await login(email);
+      const { user } = await login(email, password);
       console.log("Login successful:", user);
       setCurrentUser(user);
 
@@ -227,8 +228,6 @@ const App: React.FC = () => {
           }));
         },
         refreshToken,
-        sessionStorage.getItem('sf_consumer_key') || undefined,
-        sessionStorage.getItem('sf_consumer_secret') || undefined,
         (newAccessToken) => {
           console.log("[App] Updating access token for org", newOrgId);
           setOrgs(currentOrgs => currentOrgs.map(org => {

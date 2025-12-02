@@ -7,62 +7,69 @@ interface OAuthCallbackProps {
     onError: (error: string) => void;
 }
 
-let hasProcessed = false;
-
 const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onSuccess, onError }) => {
     const [status, setStatus] = useState<'PROCESSING' | 'SUCCESS' | 'ERROR'>('PROCESSING');
     const [message, setMessage] = useState('Completing authentication...');
 
     useEffect(() => {
         const processCallback = async () => {
-            if (hasProcessed) return;
-            hasProcessed = true;
-
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const error = urlParams.get('error');
             const errorDescription = urlParams.get('error_description');
 
-            if (error) {
-                setStatus('ERROR');
-                setMessage(`Salesforce Error: ${errorDescription || error}`);
-                onError(errorDescription || error);
+            // 🚨 Prevent double processing in React Strict Mode
+            // We check if THIS specific code has been processed.
+            if (code && sessionStorage.getItem('last_processed_code') === code) {
+                console.log('[OAuth] Code already processed. Skipping.');
                 return;
             }
 
-            if (!code) {
+            // ❌ Salesforce returned an error
+            if (error) {
+                const errMsg = errorDescription || error;
+                console.error('[OAuth] Salesforce Error:', errMsg);
                 setStatus('ERROR');
-                setMessage('No authorization code found in URL.');
+                setMessage(`Salesforce Error: ${errMsg}`);
+                onError(errMsg);
+                return;
+            }
+
+            // ❌ Missing authorization code
+            if (!code) {
+                console.error('[OAuth] No authorization code found.');
+                setStatus('ERROR');
+                setMessage('No authorization code found.');
                 onError('No authorization code found.');
                 return;
             }
 
+            // Mark as processed immediately to prevent race conditions
+            sessionStorage.setItem('last_processed_code', code);
+
             try {
                 setMessage('Exchanging code for access token...');
 
-                // Retrieve stored credentials
-                const clientId = sessionStorage.getItem('sf_consumer_key');
-                const clientSecret = sessionStorage.getItem('sf_consumer_secret');
+                const isSandbox = sessionStorage.getItem('is_sandbox') === 'true';
 
-                if (!clientId || !clientSecret) {
-                    throw new Error("Missing OAuth credentials in session. Please try connecting again.");
-                }
-
-                const tokens = await exchangeCodeForToken(code, clientId, clientSecret);
+                // 🔁 Call server-side exchange
+                const tokens = await exchangeCodeForToken(code, isSandbox);
 
                 setStatus('SUCCESS');
                 setMessage('Authentication successful! Redirecting...');
 
-                // Short delay to show success state
+                // Small delay for UX
                 setTimeout(() => {
                     onSuccess(tokens.access_token, tokens.instance_url, tokens.refresh_token);
-                }, 1000);
+                }, 800);
 
             } catch (err: any) {
-                console.error('Token Exchange Failed', err);
+                console.error('[OAuth] Token Exchange Failed:', err);
                 setStatus('ERROR');
                 setMessage(`Authentication Failed: ${err.message}`);
                 onError(err.message);
+                // If failed, maybe allow retry? But code is likely burned.
+                // We keep it marked as processed to avoid loop.
             }
         };
 
@@ -72,6 +79,7 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onSuccess, onError }) => 
     return (
         <div className="fixed inset-0 bg-slate-50 flex items-center justify-center z-50">
             <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full text-center">
+
                 {status === 'PROCESSING' && (
                     <>
                         <Loader2 size={48} className="text-blue-500 animate-spin mx-auto mb-4" />
@@ -93,9 +101,12 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onSuccess, onError }) => 
                         <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
                         <h2 className="text-xl font-bold text-slate-800 mb-2">Connection Failed</h2>
                         <p className="text-red-500 mb-6">{message}</p>
-                        <a href="/" className="text-blue-500 hover:underline font-medium">Return to Home</a>
+                        <a href="/" className="text-blue-500 hover:underline font-medium">
+                            Return to Home
+                        </a>
                     </>
                 )}
+
             </div>
         </div>
     );

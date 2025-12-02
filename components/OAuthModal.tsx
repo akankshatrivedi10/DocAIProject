@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Cloud, Lock, ShieldCheck, ExternalLink } from 'lucide-react';
 import { OrgType } from '../types';
+import { getAuthorizationUrl, generateCodeVerifier, generateCodeChallenge } from '../services/realSalesforceService';
 
 interface OAuthModalProps {
   isOpen: boolean;
@@ -20,53 +21,32 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
 
   if (!isOpen) return null;
 
-  // PKCE helper functions
-  const generateCodeVerifier = () => {
-    const array = new Uint8Array(64);
-    window.crypto.getRandomValues(array);
-    return Array.from(array, (b) => ('0' + b.toString(16)).slice(-2)).join('');
-  };
-
-  const base64UrlEncode = (buffer: ArrayBuffer) => {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    bytes.forEach((b) => (binary += String.fromCharCode(b)));
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  };
-
-  const sha256 = async (plain: string) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(plain);
-    const hash = await window.crypto.subtle.digest('SHA-256', data);
-    return base64UrlEncode(hash);
-  };
-
   const handleOAuthRedirect = async () => {
     setLoading(true);
 
-    const finalClientId = consumerKey || '3MVG97ZwUE6kNctdPkJrrYAgchEVQTolx78HA6A9OXlvYTVtA0yE9oiO1Ge06pjyFh6muNBZg9Wt747IiFaau';
-    const finalClientSecret = consumerSecret || '31C5B0E479EF726E8DA6C5C284BA6022EDAF5136C34A20455227700E7EA49A62';
+    // 🎯 REQUIREMENT #2: Use Centralized Connected App with PKCE
 
-    // Generate PKCE code verifier and challenge
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = await sha256(codeVerifier);
+    // 1. Generate PKCE Verifier & Challenge
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
 
-    // Store for use during token exchange
-    sessionStorage.setItem('pkce_code_verifier', codeVerifier);
-    sessionStorage.setItem('sf_consumer_key', finalClientId);
-    sessionStorage.setItem('sf_consumer_secret', finalClientSecret);
+    // 2. Store Verifier for Token Exchange step
+    sessionStorage.setItem('pkce_code_verifier', verifier);
 
-    const redirectUri = `${window.location.origin}/oauth/callback`;
+    // Store Sandbox status so Callback knows which endpoint to use
+    const isSandbox = selectedOrgType === OrgType.SANDBOX;
+    sessionStorage.setItem('is_sandbox', isSandbox ? 'true' : 'false');
 
-    let loginUrl = selectedOrgType === OrgType.SANDBOX
-      ? 'https://test.salesforce.com'
-      : 'https://login.salesforce.com';
+    // 3. Generate URL with Challenge
+    let authUrl = getAuthorizationUrl(challenge);
 
     if (showCustomDomain && customDomain) {
-      loginUrl = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
+      // If custom domain is used, we need to replace login.salesforce.com with the custom domain
+      const domain = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
+      authUrl = authUrl.replace('https://login.salesforce.com', domain);
+    } else if (selectedOrgType === OrgType.SANDBOX) {
+      authUrl = authUrl.replace('https://login.salesforce.com', 'https://test.salesforce.com');
     }
-
-    const authUrl = `${loginUrl}/services/oauth2/authorize?response_type=code&client_id=${finalClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     window.location.href = authUrl;
   };
@@ -152,47 +132,11 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
           <div className="mt-6 flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
             <ShieldCheck className="text-blue-600 shrink-0 mt-0.5" size={16} />
             <p className="text-xs text-blue-800">
-              We use secure OAuth 2.0 with PKCE. Your password is never stored on our servers.
+              We use secure OAuth 2.0. Your credentials are never stored on our servers.
             </p>
           </div>
-
-          {/* Advanced Settings Toggle */}
-          <div className="pt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-xs text-slate-400 hover:text-blue-600 font-medium underline decoration-dotted"
-            >
-              {showAdvanced ? 'Hide Connected App Settings' : 'I have my own Connected App'}
-            </button>
-          </div>
-
-          {/* Advanced Fields */}
-          {showAdvanced && (
-            <div className="mt-4 space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200 text-left animate-in slide-in-from-top-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Key</label>
-                <input
-                  type="text"
-                  value={consumerKey}
-                  onChange={(e) => setConsumerKey(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                  placeholder="3MVG9..."
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1 ml-1">Consumer Secret</label>
-                <input
-                  type="password"
-                  value={consumerSecret}
-                  onChange={(e) => setConsumerSecret(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs font-mono"
-                  placeholder="908D..."
-                />
-              </div>
-            </div>
-          )}
         </div>
+
 
         <div className="bg-slate-50 px-8 py-4 text-center border-t border-slate-100 relative">
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xs font-medium">Cancel</button>
