@@ -9,6 +9,10 @@ import AuthPage from './components/AuthPages';
 import OAuthModal from './components/OAuthModal';
 import OAuthCallback from './components/OAuthCallback';
 import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, IntegrationType, SyncState, CustomerProfile, AuthView, User, MetadataItem, MetadataType, SystemRole } from './types';
+import { login } from './services/authService';
+import SignUp from './components/Auth/SignUp';
+import EmailVerification from './components/Auth/EmailVerification';
+import SalesConsole from './components/Internal/SalesConsole';
 // Switched to real service
 // Switched to real service
 import { performRealSync } from './services/realSalesforceService';
@@ -24,9 +28,12 @@ import UserHeader from './components/UserHeader';
 
 const App: React.FC = () => {
   // Navigation State
-  const [authView, setAuthView] = useState<AuthView>('LANDING'); // Start at Landing Page
+  const [authView, setAuthView] = useState<AuthView>('LANDING');
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DASHBOARD);
-
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   // Dev Workspace Selection State
   const [selectedDevItems, setSelectedDevItems] = useState<Set<string>>(new Set());
   const [selectedMetadataItems, setSelectedMetadataItems] = useState<Set<string>>(new Set());
@@ -51,7 +58,8 @@ const App: React.FC = () => {
   const [isOAuthCallback, setIsOAuthCallback] = useState(window.location.pathname === '/oauth/callback');
 
   useEffect(() => {
-    // Load persisted session
+    // Check for existing session (mock)
+    // In a real app, we'd check localStorage or a cookie
     const savedUser = localStorage.getItem('docai_user');
     const savedProfile = localStorage.getItem('docai_profile');
 
@@ -88,11 +96,12 @@ const App: React.FC = () => {
     localStorage.setItem('docai_orgs', JSON.stringify(connectedOrgs));
   }, [orgs]);
 
-  // Safety: If user is logged in, don't show landing page (unless in callback)
+  // Safety: If user is logged in, show app; if logged out, show landing
   useEffect(() => {
     if (currentUser && authView === 'LANDING' && !isOAuthCallback) {
       setAuthView('APP');
     }
+    // Don't auto-redirect to landing - let explicit logout handle it
   }, [currentUser, authView, isOAuthCallback]);
 
   const activeOrg = orgs.find(o => o.id === activeOrgId) || null;
@@ -116,6 +125,28 @@ const App: React.FC = () => {
     }
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Attempting login with:", email);
+    setIsLoading(true);
+    setLoginError('');
+    try {
+      const user = await login(email);
+      console.log("Login successful:", user);
+      setCurrentUser(user);
+
+      // Persist session
+      localStorage.setItem('docai_user', JSON.stringify(user));
+
+      setAuthView('APP');
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setLoginError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     setCustomerProfile(null);
@@ -123,6 +154,8 @@ const App: React.FC = () => {
     localStorage.removeItem('docai_profile');
     setAuthView('LANDING');
     setActiveTab(Tab.DASHBOARD);
+    setEmail('');
+    setPassword('');
   };
 
   const initiateAddOrg = (type: OrgType) => {
@@ -313,8 +346,6 @@ const App: React.FC = () => {
 
   // --- View Switching Logic ---
 
-  // --- View Switching Logic ---
-
   if (isOAuthCallback) {
     return (
       <OAuthCallback
@@ -328,18 +359,111 @@ const App: React.FC = () => {
     );
   }
 
+  // --- Landing Page (Public) ---
   if (authView === 'LANDING') {
     return <LandingPage setView={setAuthView} />;
   }
 
-  if (authView === 'LOGIN' || authView === 'SIGNUP') {
-    return <AuthPage view={authView} setView={setAuthView} onAuthSuccess={handleAuthSuccess} />;
+  // --- Auth Views ---
+  if (authView === 'SIGNUP') {
+    return <SignUp onNavigate={(view) => setAuthView(view as AuthView)} />;
   }
 
-  // --- Main App Logic ---
+  if (authView === 'VERIFY') {
+    return <EmailVerification onSuccess={(user) => { setCurrentUser(user); setAuthView('APP'); }} />;
+  }
 
+  if (authView === 'LOGIN') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
+          <div className="text-center mb-8">
+            <div className="w-12 h-12 bg-blue-600 rounded-xl mx-auto flex items-center justify-center text-white font-bold text-xl mb-4 shadow-lg shadow-blue-200">
+              DB
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">Welcome back</h2>
+            <p className="text-slate-500 mt-2">Sign in to your account</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="john@company.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {loginError && (
+              <p className="text-red-500 text-sm">{loginError}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-slate-500">
+            Don't have an account?{' '}
+            <button onClick={() => setAuthView('SIGNUP')} className="text-blue-600 font-medium hover:underline">
+              Start free trial
+            </button>
+          </div>
+
+          {/* Quick Login for Testing */}
+          <div className="mt-6 pt-6 border-t border-slate-200">
+            <p className="text-xs text-slate-500 text-center mb-3">Quick Login (Testing)</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEmail('info@brahmcloud');
+                  setPassword('test123');
+                }}
+                className="flex-1 px-3 py-2 text-xs bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200"
+              >
+                🔧 Internal User
+              </button>
+              <button
+                onClick={() => {
+                  setEmail('akankshatrivedi45@gmail.com');
+                  setPassword('test123');
+                }}
+                className="flex-1 px-3 py-2 text-xs bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors border border-green-200"
+              >
+                👤 Customer User
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Internal Console Routing ---
+  if (currentUser?.tenantId === 'internal') {
+    return <SalesConsole currentUser={currentUser} onLogout={handleLogout} />;
+  }
+
+  // --- Main SaaS App ---
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} />
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -384,8 +508,8 @@ const App: React.FC = () => {
           />}
           {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} selectedItems={selectedMetadataItems} onSelectionChange={setSelectedMetadataItems} />}
           {activeTab === Tab.DEV_HUB && <DevWorkspace activeOrg={activeOrg} setActiveTab={setActiveTab} onGenerateDoc={(story) => handleGenerateDoc('DEV', undefined, story)} setChatInitialInput={setChatInitialInput} isGeneratingDoc={isGeneratingDoc} docContent={docContent} selectedItems={resolvedSelectedItems} isJiraConnected={integrations.find(i => i.type === IntegrationType.JIRA)?.status === ConnectionStatus.CONNECTED} />}
-          {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
-          {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} />}
+          {activeTab === Tab.GTM_HUB && <GTMWorkspace activeOrg={activeOrg} role="GTM" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} currentUser={currentUser} />}
+          {activeTab === Tab.SALES_ENABLEMENT && <GTMWorkspace activeOrg={activeOrg} role="SALES" setActiveTab={setActiveTab} onGenerateDoc={(role, specificRole, processName) => handleGenerateDoc(role, specificRole, processName)} isGeneratingDoc={isGeneratingDoc} docContent={docContent} currentUser={currentUser} />}
           {activeTab === Tab.CHAT && <ChatInterface activeOrg={activeOrg} orgs={orgs} initialInput={chatInitialInput} />}
           {activeTab === Tab.SETTINGS && customerProfile && currentUser && (
             currentUser.systemRole === SystemRole.ADMIN ? (

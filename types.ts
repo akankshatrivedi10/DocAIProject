@@ -11,7 +11,7 @@ export enum Tab {
   SETTINGS = 'SETTINGS'
 }
 
-export type AuthView = 'LANDING' | 'LOGIN' | 'SIGNUP' | 'APP';
+export type AuthView = 'LANDING' | 'LOGIN' | 'SIGNUP' | 'VERIFY' | 'APP';
 
 export enum OrgType {
   PRODUCTION = 'Production',
@@ -227,6 +227,7 @@ export interface User {
   role: UserRole;
   systemRole: SystemRole; // Admin or User permission level
   organizationId: string;
+  tenantId: string; // 'internal' for DocBot employees, UUID for customers
   avatarUrl?: string;
   status: 'Active' | 'Invited' | 'Deactivated';
   lastLogin?: Date;
@@ -302,4 +303,43 @@ export interface MetadataItem {
   children?: MetadataItem[];
   metadata?: any;
   lastModifiedDate?: string;
+}
+
+// --- CRM Models (Internal Sales Console) ---
+
+export interface Lead {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  status: 'New' | 'Contacted' | 'Qualified' | 'Converted';
+  source: string;
+  createdAt: Date;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  industry: string;
+  customerProfileId?: string; // Link to SaaS Tenant
+  status: 'Prospect' | 'Customer' | 'Churned';
+  createdAt: Date;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  accountId: string;
+  role?: string;
+}
+
+export interface Opportunity {
+  id: string;
+  name: string;
+  accountId: string;
+  stage: 'Prospecting' | 'Qualification' | 'Proposal' | 'Closed Won' | 'Closed Lost';
+  amount: number;
+  closeDate: Date;
+  createdAt: Date;
 }

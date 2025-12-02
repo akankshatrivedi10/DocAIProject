@@ -51,6 +51,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ setView }) => {
               <a href="#contact" className="hover:text-blue-600 transition-colors">Contact</a>
             </div>
             <div className="w-px h-6 bg-slate-200 hidden md:block"></div>
+            <button
+              onClick={() => setView('LOGIN')}
+              className="text-sm text-slate-500 hover:text-slate-700 transition-colors font-medium"
+              title="For DocBot team members"
+            >
+              Internal Team
+            </button>
             <Button
               variant="ghost"
               size="sm"
