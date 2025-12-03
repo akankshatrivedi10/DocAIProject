@@ -617,7 +617,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ setView }) => {
 import { ENV_CONFIG, getStoredEnvironment, setStoredEnvironment, EnvironmentMode } from '../config/envConfig';
 
 const EnvironmentSelector = () => {
-  const [currentEnv, setCurrentEnv] = useState<EnvironmentMode>(getStoredEnvironment());
+  const [currentEnv, setCurrentEnv] = useState<EnvironmentMode>(getStoredEnvironment() || 'LOCALHOST');
 
   const handleEnvChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newEnv = e.target.value as EnvironmentMode;

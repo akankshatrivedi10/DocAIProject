@@ -20,9 +20,9 @@ export const ENV_CONFIG = {
 
 export type EnvironmentMode = 'LOCALHOST' | 'TEST_SERVER';
 
-export const getStoredEnvironment = (): EnvironmentMode => {
-    if (typeof window === 'undefined') return 'LOCALHOST';
-    return (localStorage.getItem('docbot_env_mode') as EnvironmentMode) || 'LOCALHOST';
+export const getStoredEnvironment = (): EnvironmentMode | null => {
+    if (typeof window === 'undefined') return null;
+    return (localStorage.getItem('docbot_env_mode') as EnvironmentMode) || null;
 };
 
 export const setStoredEnvironment = (mode: EnvironmentMode) => {
