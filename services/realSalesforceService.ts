@@ -129,11 +129,12 @@ export const generateCodeChallenge = async (verifier: string): Promise<string> =
 /**
  * Generates the Salesforce Authorization URL for the centralized Connected App
  */
-export const getAuthorizationUrl = (codeChallenge?: string, forceEnv?: 'local' | 'prod'): string => {
+export const getAuthorizationUrl = (codeChallenge?: string, forceEnv?: 'local' | 'prod', clientId?: string): string => {
     const { REDIRECT_URI } = getEnvironmentConfig(forceEnv);
 
     // 🎯 REQUIREMENT #1: Use Central Connected App (Client ID from test credentials)
-    const CLIENT_ID = TEST_CREDENTIALS.salesforce.consumerKey;
+    // Allow overriding Client ID for specific orgs/sandboxes
+    const CLIENT_ID = clientId || TEST_CREDENTIALS.salesforce.consumerKey;
     const LOGIN_URL = 'https://login.salesforce.com'; // Default to prod login. UI can override for sandbox.
 
     const params = new URLSearchParams();

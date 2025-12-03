@@ -38,7 +38,7 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
     sessionStorage.setItem('is_sandbox', isSandbox ? 'true' : 'false');
 
     // 3. Generate URL with Challenge
-    let authUrl = getAuthorizationUrl(challenge);
+    let authUrl = getAuthorizationUrl(challenge, undefined, consumerKey);
 
     if (showCustomDomain && customDomain) {
       // If custom domain is used, we need to replace login.salesforce.com with the custom domain
@@ -115,6 +115,33 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
               </div>
             )}
           </div>
+
+          {/* Advanced Options Toggle */}
+          <div className="mb-4">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+            >
+              {showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options'}
+            </button>
+          </div>
+
+          {/* Advanced Options Section */}
+          {showAdvanced && (
+            <div className="mb-6 p-3 bg-slate-50 rounded-lg border border-slate-100 animate-in slide-in-from-top-2">
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-slate-700 mb-1">Consumer Key (Client ID)</label>
+                <input
+                  type="text"
+                  value={consumerKey}
+                  onChange={(e) => setConsumerKey(e.target.value)}
+                  placeholder="Paste your Connected App Consumer Key"
+                  className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 text-xs"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Leave empty to use default credentials</p>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handleOAuthRedirect}
