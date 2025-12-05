@@ -135,7 +135,7 @@ export const getAuthorizationUrl = (codeChallenge?: string, forceEnv?: 'local' |
 
     // 🎯 REQUIREMENT #1: Use Central Connected App (Client ID from test credentials)
     // Allow overriding Client ID for specific orgs/sandboxes
-    const CLIENT_ID = clientId || TEST_CREDENTIALS.salesforce.consumerKey;
+    const CLIENT_ID = clientId || TEST_CREDENTIALS.salesforce.consumerKey || import.meta.env.VITE_SALESFORCE_CONSUMER_KEY;
     const LOGIN_URL = loginUrl || 'https://login.salesforce.com'; // Default to prod login. UI can override for sandbox.
 
     const params = new URLSearchParams();
