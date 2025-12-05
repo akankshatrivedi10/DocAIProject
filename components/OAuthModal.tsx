@@ -14,10 +14,15 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
   const [selectedOrgType, setSelectedOrgType] = useState<OrgType>(orgType);
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showCustomDomain, setShowCustomDomain] = useState(true);
-  const [customDomain, setCustomDomain] = useState('softwareag--qa.sandbox.my.salesforce.com');
+  const [showCustomDomain, setShowCustomDomain] = useState(false);
+  const [customDomain, setCustomDomain] = useState('');
   const [consumerKey, setConsumerKey] = useState('');
   const [consumerSecret, setConsumerSecret] = useState('');
+
+  // Sync state with prop when modal opens/prop changes
+  React.useEffect(() => {
+    setSelectedOrgType(orgType);
+  }, [orgType, isOpen]);
 
   if (!isOpen) return null;
 
@@ -44,8 +49,12 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
       // If custom domain is used, we need to replace login.salesforce.com with the custom domain
       const domain = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
       authUrl = authUrl.replace('https://login.salesforce.com', domain);
+      sessionStorage.setItem('sf_custom_domain', domain);
     } else if (selectedOrgType === OrgType.SANDBOX) {
       authUrl = authUrl.replace('https://login.salesforce.com', 'https://test.salesforce.com');
+      sessionStorage.setItem('sf_custom_domain', 'https://test.salesforce.com');
+    } else {
+      sessionStorage.removeItem('sf_custom_domain');
     }
 
     window.location.href = authUrl;

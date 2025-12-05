@@ -7,13 +7,15 @@ export const ENV_CONFIG = {
         label: 'Localhost (Dev)',
         appUrl: 'http://localhost:3000',
         apiUrl: 'http://localhost:8080',   // Point to Local Proxy for JSForce
-        redirectUri: 'http://localhost:3000/oauth/callback'
+        redirectUri: 'http://localhost:3000/oauth/callback',
+        loginUrl: 'https://login.salesforce.com'
     },
     TEST_SERVER: {
         label: 'Test Hosted Server (Vercel)',
         appUrl: 'https://doc-ai-project.vercel.app',
         apiUrl: '',
-        redirectUri: 'https://doc-ai-project.vercel.app/oauth/callback'
+        redirectUri: 'https://doc-ai-project.vercel.app/oauth/callback',
+        loginUrl: 'https://login.salesforce.com'
     }
 };
 

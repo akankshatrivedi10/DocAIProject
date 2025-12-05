@@ -61,13 +61,13 @@ http.createServer((req, res) => {
 
         req.on('end', () => {
             try {
-                const { code, redirect_uri, code_verifier, is_sandbox } = JSON.parse(body);
+                const { code, redirect_uri, code_verifier, is_sandbox, login_url } = JSON.parse(body);
 
                 const clientId = process.env.SF_CLIENT_ID;
                 const clientSecret = process.env.SF_CLIENT_SECRET;
 
-                // 🎯 Use correct login URL based on environment (Sandbox vs Production)
-                const loginUrl = is_sandbox ? 'https://test.salesforce.com' : 'https://login.salesforce.com';
+                // 🎯 Use correct login URL: specific domain > sandbox/prod toggle
+                const loginUrl = login_url || (is_sandbox ? 'https://test.salesforce.com' : 'https://login.salesforce.com');
 
                 if (!clientId || !clientSecret) {
                     res.writeHead(500, { 'Content-Type': 'application/json', ...corsHeaders });

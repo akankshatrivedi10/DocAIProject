@@ -51,9 +51,13 @@ const OAuthCallback: React.FC<OAuthCallbackProps> = ({ onSuccess, onError }) => 
                 setMessage('Exchanging code for access token...');
 
                 const isSandbox = sessionStorage.getItem('is_sandbox') === 'true';
+                const customDomain = sessionStorage.getItem('sf_custom_domain');
 
                 // 🔁 Call server-side exchange
-                const tokens = await exchangeCodeForToken(code, isSandbox);
+                const tokens = await exchangeCodeForToken(code, isSandbox, customDomain || undefined);
+
+                // Clean up
+                sessionStorage.removeItem('sf_custom_domain');
 
                 setStatus('SUCCESS');
                 setMessage('Authentication successful! Redirecting...');

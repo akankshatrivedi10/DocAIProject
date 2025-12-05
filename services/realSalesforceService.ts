@@ -85,7 +85,8 @@ const getEnvironmentConfig = (forceEnv?: 'local' | 'prod') => {
         isLocal,
         REDIRECT_URI,
         PROXY_URL,
-        API_URL
+        API_URL,
+        loginUrl: config.loginUrl
     };
 };
 
@@ -130,12 +131,12 @@ export const generateCodeChallenge = async (verifier: string): Promise<string> =
  * Generates the Salesforce Authorization URL for the centralized Connected App
  */
 export const getAuthorizationUrl = (codeChallenge?: string, forceEnv?: 'local' | 'prod', clientId?: string): string => {
-    const { REDIRECT_URI } = getEnvironmentConfig(forceEnv);
+    const { REDIRECT_URI, loginUrl } = getEnvironmentConfig(forceEnv);
 
     // 🎯 REQUIREMENT #1: Use Central Connected App (Client ID from test credentials)
     // Allow overriding Client ID for specific orgs/sandboxes
     const CLIENT_ID = clientId || TEST_CREDENTIALS.salesforce.consumerKey;
-    const LOGIN_URL = 'https://login.salesforce.com'; // Default to prod login. UI can override for sandbox.
+    const LOGIN_URL = loginUrl || 'https://login.salesforce.com'; // Default to prod login. UI can override for sandbox.
 
     const params = new URLSearchParams();
     params.append('response_type', 'code');
@@ -163,6 +164,7 @@ export const getAuthorizationUrl = (codeChallenge?: string, forceEnv?: 'local' |
 export const exchangeCodeForToken = async (
     code: string,
     isSandbox: boolean = false,
+    customLoginUrl?: string,
     forceEnv?: 'local' | 'prod'
 ): Promise<SalesforceConnection> => {
 
@@ -185,7 +187,8 @@ export const exchangeCodeForToken = async (
             code,
             redirect_uri: REDIRECT_URI,
             code_verifier: codeVerifier,
-            is_sandbox: isSandbox // server decides login vs test endpoint
+            is_sandbox: isSandbox, // server decides login vs test endpoint
+            login_url: customLoginUrl || getEnvironmentConfig(forceEnv).loginUrl // 🎯 Pass specific login URL
         })
     });
 

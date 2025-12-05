@@ -532,7 +532,7 @@ const App: React.FC = () => {
         isOpen={isOAuthOpen}
         onClose={() => setIsOAuthOpen(false)}
         onSuccess={() => { }} // Not used in Web Server Flow, modal redirects
-        orgType={OrgType.PRODUCTION}
+        orgType={oauthOrgType}
       />
 
       {/* Syncing Overlay Toast */}
