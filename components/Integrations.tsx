@@ -10,8 +10,9 @@ interface IntegrationsProps {
     integrations: Integration[];
     activeOrgId: string | null;
     setActiveOrgId: (id: string) => void;
+    onDisconnectOrg: (id: string) => void;
     initiateAddOrg: (type: OrgType) => void;
-    onConnectJira?: (environment: 'test' | 'production') => void;
+    onConnectJira?: (env: 'test' | 'production') => void;
 }
 
 const Integrations: React.FC<IntegrationsProps> = ({
@@ -19,6 +20,7 @@ const Integrations: React.FC<IntegrationsProps> = ({
     integrations,
     activeOrgId,
     setActiveOrgId,
+    onDisconnectOrg,
     initiateAddOrg,
     onConnectJira
 }) => {
@@ -170,6 +172,7 @@ const Integrations: React.FC<IntegrationsProps> = ({
                             org={org}
                             isActive={activeOrgId === org.id}
                             onClick={() => setActiveOrgId(org.id)}
+                            onDisconnectOrg={onDisconnectOrg}
                             delay={0.25 + index * 0.05}
                         />
                     ))}
@@ -227,9 +230,8 @@ const AddOrgCard = ({ onClick, title, gradient, delay }: any) => (
 );
 
 // Org Card Component
-const OrgCard = ({ org, isActive, onClick, delay }: any) => (
+const OrgCard = ({ org, isActive, onClick, onDisconnectOrg, delay }: any) => (
     <motion.div
-        onClick={onClick}
         className={`relative p-6 rounded-2xl border-2 cursor-pointer transition-all h-48 flex flex-col justify-between ${isActive
             ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-500/20'
             : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
@@ -270,6 +272,30 @@ const OrgCard = ({ org, isActive, onClick, delay }: any) => (
                     <Lock size={10} />
                     TLS 1.2
                 </span>
+            </div>
+            <div className="flex gap-2">
+                {(!org.status || org.status === ConnectionStatus.DISCONNECTED) ? (
+                    <button className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                        Connect
+                    </button>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onClick} // Use the onClick prop passed to OrgCard for setting active
+                            disabled={isActive}
+                            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${isActive ? 'bg-blue-50 text-blue-600 border-blue-200 font-medium' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                        >
+                            {isActive ? 'Active Context' : 'Set Active'}
+                        </button>
+                        <button
+                            onClick={() => onDisconnectOrg(org.id)}
+                            className="text-xs px-2 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                            title="Disconnect Org"
+                        >
+                            Disconnect
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     </motion.div>

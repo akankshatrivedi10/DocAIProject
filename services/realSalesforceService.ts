@@ -17,6 +17,8 @@ export interface SalesforceConnection {
     refresh_token: string;
     issued_at: number;
     expires_in: number; // Seconds
+    connectedAt: string; // ISO 8601
+    lastUsedAt?: string; // ISO 8601
 }
 
 // ============================================================================
@@ -188,7 +190,9 @@ export const exchangeCodeForToken = async (
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         issued_at: data.issued_at ? parseInt(data.issued_at, 10) : Date.now(),
-        expires_in: data.expires_in || 7200
+        expires_in: data.expires_in || 7200,
+        connectedAt: new Date().toISOString(),
+        lastUsedAt: new Date().toISOString()
     };
 
     try {
@@ -220,10 +224,66 @@ export const saveSalesforceConnection = (connection: SalesforceConnection) => {
         connections.push(connection);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
-    localStorage.setItem('sf_access_token', connection.access_token);
-    localStorage.setItem('sf_instance_url', connection.instance_url);
-    if (connection.refresh_token) {
-        localStorage.setItem('sf_refresh_token', connection.refresh_token);
+
+    // Auto-update active context if this is the first one or specifically requested
+    if (connections.length === 1) {
+        setActiveConnection(connection.salesforce_org_id);
+    }
+};
+
+export const setActiveConnection = (orgId: string) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('docbot_active_org_id', orgId);
+
+    // Update lastUsedAt
+    const connections = getSalesforceConnections();
+    const connIndex = connections.findIndex(c => c.salesforce_org_id === orgId);
+    if (connIndex >= 0) {
+        connections[connIndex].lastUsedAt = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
+
+        // Update legacy keys for backward compatibility
+        localStorage.setItem('sf_access_token', connections[connIndex].access_token);
+        localStorage.setItem('sf_instance_url', connections[connIndex].instance_url);
+        if (connections[connIndex].refresh_token) {
+            localStorage.setItem('sf_refresh_token', connections[connIndex].refresh_token);
+        }
+    }
+};
+
+export const getActiveConnectionId = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('docbot_active_org_id');
+};
+
+export const getActiveConnection = (): SalesforceConnection | undefined => {
+    const activeId = getActiveConnectionId();
+    if (!activeId) return undefined;
+    return getSalesforceConnectionByOrg(activeId);
+};
+
+export const removeConnection = (orgId: string) => {
+    if (typeof window === 'undefined') return;
+    let connections = getSalesforceConnections();
+    connections = connections.filter(c => c.salesforce_org_id !== orgId);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(connections));
+
+    // If we removed the active one, switch to another or clear
+    if (getActiveConnectionId() === orgId) {
+        if (connections.length > 0) {
+            // Switch to most recently used
+            connections.sort((a, b) => {
+                const timeA = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+                const timeB = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+                return timeB - timeA;
+            });
+            setActiveConnection(connections[0].salesforce_org_id);
+        } else {
+            localStorage.removeItem('docbot_active_org_id');
+            localStorage.removeItem('sf_access_token');
+            localStorage.removeItem('sf_instance_url');
+            localStorage.removeItem('sf_refresh_token');
+        }
     }
 };
 

@@ -16,7 +16,7 @@ import EmailVerification from './components/Auth/EmailVerification';
 import SalesConsole from './components/Internal/SalesConsole';
 // Switched to real service
 // Switched to real service
-import { performRealSync } from './services/realSalesforceService';
+import { performRealSync, getActiveConnectionId, setActiveConnection as saveActiveConnection, removeConnection } from './services/realSalesforceService';
 import { generateRoleBasedDoc } from './services/geminiService';
 import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play, Component, ShieldCheck } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -83,7 +83,18 @@ const App: React.FC = () => {
           if (o.metadataSummary) o.metadataSummary.fetchedAt = new Date(o.metadataSummary.fetchedAt);
         });
         setOrgs(parsed);
-        if (parsed.length > 0) setActiveOrgId(parsed[0].id);
+
+        // Restore active org from persistent service
+        const storedActiveId = getActiveConnectionId();
+        const activeExists = parsed.find((o: any) => o.id === storedActiveId);
+
+        if (activeExists) {
+          setActiveOrgId(storedActiveId);
+        } else if (parsed.length > 0) {
+          // Fallback to first if stored active not found
+          setActiveOrgId(parsed[0].id);
+          saveActiveConnection(parsed[0].id);
+        }
       } catch (e) {
         console.error("Failed to load orgs", e);
       }
@@ -205,6 +216,8 @@ const App: React.FC = () => {
 
     setOrgs(prev => [...prev, newOrg]);
     setActiveOrgId(newOrgId);
+    saveActiveConnection(newOrgId); // Force new org as active context
+
     setAuthView('APP'); // Ensure we are in the app view
     setActiveTab(Tab.METADATA); // Redirect to Metadata Tab
 
@@ -488,7 +501,20 @@ const App: React.FC = () => {
             {activeOrg && (
               <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded-full border shadow-sm">
                 <div className={`w-2 h-2 rounded-full ${activeOrg.status === ConnectionStatus.CONNECTED ? 'bg-green-500' : (activeOrg.status === ConnectionStatus.ERROR ? 'bg-red-500' : 'bg-amber-500')}`}></div>
-                Current Context: <span className="font-semibold text-slate-700">{activeOrg.alias}</span>
+                Current Context:
+                <select
+                  value={activeOrgId || ''}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setActiveOrgId(newId);
+                    saveActiveConnection(newId);
+                  }}
+                  className="font-semibold text-slate-700 bg-transparent border-none focus:ring-0 cursor-pointer py-0 pl-1 pr-6 text-xs"
+                >
+                  {orgs.filter(o => o.status !== ConnectionStatus.DISCONNECTED).map(o => (
+                    <option key={o.id} value={o.id}>{o.alias || o.name}</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
@@ -499,7 +525,29 @@ const App: React.FC = () => {
             orgs={orgs}
             integrations={integrations}
             activeOrgId={activeOrgId}
-            setActiveOrgId={setActiveOrgId}
+            setActiveOrgId={(id) => {
+              setActiveOrgId(id);
+              saveActiveConnection(id);
+            }}
+            onDisconnectOrg={(id) => {
+              const confirmed = window.confirm("Are you sure you want to disconnect this org? Metadata cache will be cleared.");
+              if (confirmed) {
+                removeConnection(id);
+                setOrgs(prev => prev.filter(o => o.id !== id));
+
+                // Logic to switch active if current was deleted
+                if (activeOrgId === id) {
+                  const remaining = orgs.filter(o => o.id !== id);
+                  if (remaining.length > 0) {
+                    const nextId = remaining[0].id;
+                    setActiveOrgId(nextId);
+                    saveActiveConnection(nextId);
+                  } else {
+                    setActiveOrgId(null);
+                  }
+                }
+              }
+            }}
             initiateAddOrg={(type) => { setOauthOrgType(type); setIsOAuthOpen(true); }}
             onConnectJira={(env) => {
               setIntegrations(prev => prev.map(i =>
