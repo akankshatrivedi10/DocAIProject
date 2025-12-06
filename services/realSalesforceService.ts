@@ -292,10 +292,10 @@ const buildProxiedInstanceUrl = (proxyBase: string, instanceUrl: string) => {
     if (!proxyBase) return instanceUrl;
     // Remove trailing slash from proxyBase
     const proxy = proxyBase.replace(/\/+$/, '');
-    // Strip protocol from instance url
-    const stripped = instanceUrl.replace(/^https?:\/\//, '');
-    // Join safely
-    return `${proxy}/${stripped}`;
+
+    // 🎯 FIX: Do NOT strip protocol. cors-anywhere expects /https://target.com
+    // So we just append the full instanceUrl to the proxy base
+    return `${proxy}/${instanceUrl}`;
 };
 
 export const performRealSync = async (
@@ -349,7 +349,8 @@ export const performRealSync = async (
     try {
         globalDescribe = await conn.describeGlobal();
     } catch (e: any) {
-        throw new Error(`Failed to describe global: ${e.message}`);
+        console.error("describeGlobal failed details:", JSON.stringify(e, null, 2));
+        throw new Error(`Failed to describe global: ${e.message || JSON.stringify(e)}`);
     }
 
     if (!globalDescribe || !globalDescribe.sobjects) {
