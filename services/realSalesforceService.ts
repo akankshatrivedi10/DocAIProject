@@ -294,8 +294,8 @@ const buildProxiedInstanceUrl = (proxyBase: string, instanceUrl: string) => {
     const proxy = proxyBase.replace(/\/+$/, '');
 
     // 🎯 FIX: Do NOT strip protocol. cors-anywhere expects /https://target.com
-    // So we just append the full instanceUrl to the proxy base
-    return `${proxy}/${instanceUrl}`;
+    // So we just append the full instanceUrl (without trailing slash) to the proxy base
+    return `${proxy}/${instanceUrl.replace(/\/+$/, '')}`;
 };
 
 export const performRealSync = async (

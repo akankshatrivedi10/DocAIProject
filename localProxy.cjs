@@ -32,7 +32,7 @@ const port = 8080;
 // Initialize CORS Anywhere
 const proxyServer = cors_proxy.createServer({
     originWhitelist: [], // Allow all origins
-    requireHeader: ['origin'],
+    requireHeader: [],
     removeHeaders: ['cookie', 'cookie2']
 });
 
