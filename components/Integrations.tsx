@@ -254,6 +254,11 @@ const OrgCard = ({ org, isActive, onClick, onDisconnectOrg, delay }: any) => (
                 <div>
                     <h4 className="font-bold text-slate-900">{org.alias}</h4>
                     <p className="text-xs text-slate-500">{org.name}</p>
+                    {org.instanceUrl && (
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[120px]" title={org.instanceUrl}>
+                            {tryGetDomain(org.instanceUrl)}
+                        </p>
+                    )}
                 </div>
             </div>
             {org.status === ConnectionStatus.ERROR ? (
@@ -375,6 +380,14 @@ const StatusBadge = ({ icon, text, color }: any) => {
             {text}
         </motion.span>
     );
+};
+
+const tryGetDomain = (url: string) => {
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return url;
+    }
 };
 
 export default Integrations;
