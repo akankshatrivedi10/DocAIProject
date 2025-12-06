@@ -504,7 +504,7 @@ export const performRealSync = async (
     let flows: FlowDef[] = [];
     try {
         // First try FlowDefinitionView (REST API)
-        const records = await queryAll(conn, "SELECT Id, Label, ProcessType, Description, IsActive, DeveloperName FROM FlowDefinitionView WHERE IsActive = true");
+        const records = await queryAll(conn, "SELECT Id, Label, ProcessType, Description, IsActive, ApiName FROM FlowDefinitionView WHERE IsActive = true");
 
         // For each flow, we might want newer FlowVersionView or Tooling API for body, 
         // but FlowDefinitionView gives high level info.
@@ -512,7 +512,7 @@ export const performRealSync = async (
         // Warning: Metadata calls are heavy.
 
         flows = records.map((r: any) => ({
-            name: r.DeveloperName || r.Label.replace(/\s+/g, '_'),
+            name: r.ApiName || r.Label.replace(/\s+/g, '_'),
             label: r.Label,
             type: r.ProcessType === 'Workflow' ? 'Workflow' : (r.ProcessType === 'Flow' ? 'Screen Flow' : r.ProcessType),
             status: r.IsActive ? 'Active' : 'Draft',

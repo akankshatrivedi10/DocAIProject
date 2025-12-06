@@ -187,12 +187,24 @@ const App: React.FC = () => {
     window.history.replaceState({}, document.title, "/");
 
     const newOrgId = Date.now().toString();
-    const isSandbox = instanceUrl.includes('test') || instanceUrl.includes('cs');
+    const isSandbox = instanceUrl.includes('test') || instanceUrl.includes('cs') || instanceUrl.includes('sandbox');
+
+    // Extract a more friendly name from validity
+    let friendlyName = 'Salesforce Org';
+    try {
+      const hostname = new URL(instanceUrl).hostname;
+      // e.g. softwareag--qa.sandbox.lightning.force.com -> softwareag--qa
+      friendlyName = hostname.split('.')[0];
+      // Capitalize first letter
+      friendlyName = friendlyName.charAt(0).toUpperCase() + friendlyName.slice(1);
+    } catch (e) {
+      friendlyName = isSandbox ? 'Sandbox Org' : 'Production Org';
+    }
 
     const newOrg: Org = {
       id: newOrgId,
-      name: isSandbox ? 'Sandbox Org' : 'Production Org',
-      alias: `SF-${isSandbox ? 'SAND' : 'PROD'}`,
+      name: friendlyName,
+      alias: friendlyName.substring(0, 15), // Keep alias short
       type: isSandbox ? OrgType.SANDBOX : OrgType.PRODUCTION,
       status: ConnectionStatus.CONNECTING,
       syncState: {
