@@ -45,6 +45,14 @@ const OAuthModal: React.FC<OAuthModalProps> = ({ isOpen, onClose, orgType }) => 
     // 3. Generate URL with Challenge
     let authUrl = getAuthorizationUrl(challenge, undefined, consumerKey);
 
+    // Check for missing Client ID
+    if (authUrl.includes('client_id=undefined') || authUrl.includes('client_id=&')) {
+      setLoading(false);
+      setShowAdvanced(true);
+      alert('Salesforce Client ID is missing. Please enter it in the "Advanced Options" below (Consumer Key).');
+      return;
+    }
+
     if (showCustomDomain && customDomain) {
       // If custom domain is used, we need to replace login.salesforce.com with the custom domain
       const domain = customDomain.startsWith('http') ? customDomain : `https://${customDomain}`;
