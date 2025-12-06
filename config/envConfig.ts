@@ -13,7 +13,7 @@ export const ENV_CONFIG = {
     TEST_SERVER: {
         label: 'Test Hosted Server (Vercel)',
         appUrl: 'https://doc-ai-project.vercel.app',
-        apiUrl: '',
+        apiUrl: 'https://doc-ai-project.vercel.app/api/proxy',
         redirectUri: 'https://doc-ai-project.vercel.app/oauth/callback',
         loginUrl: 'https://login.salesforce.com'
     }
