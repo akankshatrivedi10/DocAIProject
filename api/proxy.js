@@ -14,8 +14,8 @@ export default async function handler(req, res) {
         return;
     }
 
-    // 3. Extract target URL
-    let { proxyUrl } = req.query;
+    // 3. Extract target URL and other params
+    let { proxyUrl, ...otherParams } = req.query;
 
     if (!proxyUrl) {
         return res.status(400).json({ error: 'Missing "proxyUrl" query parameter' });
@@ -29,7 +29,17 @@ export default async function handler(req, res) {
         proxyUrl = proxyUrl.replace('http:/', 'http://');
     }
 
-    // 5. Prepare headers
+    // 5. Append original query parameters (e.g., SOQL query 'q')
+    // Vercel parses the query string into req.query, separating them from the path rewrite
+    if (Object.keys(otherParams).length > 0) {
+        const urlObj = new URL(proxyUrl);
+        Object.keys(otherParams).forEach(key => {
+            urlObj.searchParams.append(key, otherParams[key]);
+        });
+        proxyUrl = urlObj.toString();
+    }
+
+    // 6. Prepare headers
     const headers = {};
     if (req.headers.authorization) headers['Authorization'] = req.headers.authorization;
     if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
