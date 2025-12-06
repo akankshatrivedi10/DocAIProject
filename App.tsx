@@ -17,6 +17,7 @@ import SalesConsole from './components/Internal/SalesConsole';
 // Switched to real service
 // Switched to real service
 import { performRealSync, getActiveConnectionId, setActiveConnection as saveActiveConnection, removeConnection } from './services/realSalesforceService';
+import { saveOrgs, loadOrgs, clearOrgMetadata } from './services/storageService';
 import { generateRoleBasedDoc } from './services/geminiService';
 import { Plus, RefreshCw, CheckCircle, AlertCircle, FileText, ExternalLink, Database, Code2, Workflow, GraduationCap, Shield, Lock, Play, Component, ShieldCheck } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -73,39 +74,35 @@ const App: React.FC = () => {
       }
     }
 
-    // Load persisted orgs
-    const savedOrgs = localStorage.getItem('docai_orgs');
-    if (savedOrgs) {
-      try {
-        const parsed = JSON.parse(savedOrgs);
-        // Restore dates
-        parsed.forEach((o: any) => {
-          if (o.metadataSummary) o.metadataSummary.fetchedAt = new Date(o.metadataSummary.fetchedAt);
-        });
-        setOrgs(parsed);
+    // Load persisted orgs (async)
+    const initOrgs = async () => {
+      const parsed = await loadOrgs();
 
-        // Restore active org from persistent service
-        const storedActiveId = getActiveConnectionId();
-        const activeExists = parsed.find((o: any) => o.id === storedActiveId);
+      // Restore active org from persistent service
+      setOrgs(parsed);
 
-        if (activeExists) {
-          setActiveOrgId(storedActiveId);
-        } else if (parsed.length > 0) {
-          // Fallback to first if stored active not found
-          setActiveOrgId(parsed[0].id);
-          saveActiveConnection(parsed[0].id);
-        }
-      } catch (e) {
-        console.error("Failed to load orgs", e);
+      const storedActiveId = getActiveConnectionId();
+      const activeExists = parsed.find((o: any) => o.id === storedActiveId);
+
+      if (activeExists) {
+        setActiveOrgId(storedActiveId);
+      } else if (parsed.length > 0) {
+        // Fallback
+        setActiveOrgId(parsed[0].id);
+        saveActiveConnection(parsed[0].id);
       }
-    }
+    };
+    initOrgs();
   }, []);
 
   // Persist orgs whenever they change
   useEffect(() => {
-    // Only persist orgs that have successfully connected and synced
-    const connectedOrgs = orgs.filter(o => o.status === ConnectionStatus.CONNECTED);
-    localStorage.setItem('docai_orgs', JSON.stringify(connectedOrgs));
+    // Only persist orgs that have successfully connected and synced or are in progress
+    // We debounce slightly or just save. Since IndexedDB is async, we fire and forget for now.
+    // Filter out disconnected or invalid states if needed, but keeping user intent is better.
+    if (orgs.length > 0) {
+      saveOrgs(orgs).catch(err => console.error("Failed to save orgs", err));
+    }
   }, [orgs]);
 
   // Safety: If user is logged in, show app; if logged out, show landing
@@ -545,6 +542,7 @@ const App: React.FC = () => {
               const confirmed = window.confirm("Are you sure you want to disconnect this org? Metadata cache will be cleared.");
               if (confirmed) {
                 removeConnection(id);
+                clearOrgMetadata(id); // Clear heavy storage
                 setOrgs(prev => prev.filter(o => o.id !== id));
 
                 // Logic to switch active if current was deleted
