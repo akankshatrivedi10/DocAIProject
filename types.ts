@@ -91,9 +91,18 @@ export interface FieldDef {
   label: string;
   type: string;
   length?: number;
+  precision?: number;
+  scale?: number;
+  digits?: number;
   required?: boolean;
+  nillable?: boolean;
+  formula?: string;
+  defaultValue?: string;
   helpText?: string;
   picklistValues?: string[];
+  referenceTo?: string[];
+  relationshipName?: string;
+  isCalculated?: boolean;
 }
 
 export interface RecordTypeDef {
@@ -103,13 +112,23 @@ export interface RecordTypeDef {
   businessProcess?: string; // e.g. Support Process
 }
 
+export interface ChildRelationshipDef {
+  field: string;
+  childSObject: string;
+  relationshipName?: string;
+  cascadeDelete?: boolean;
+}
+
 export interface ObjectDef {
   name: string;
   label: string;
   type: 'Standard' | 'Custom';
+  custom?: boolean;
+  keyPrefix?: string;
   fields: FieldDef[];
   recordTypes: RecordTypeDef[];
   relationships?: { name: string; type: 'Lookup' | 'MasterDetail'; relatedTo: string }[];
+  childRelationships?: ChildRelationshipDef[];
 }
 
 export interface ApexClassDef {
@@ -140,12 +159,14 @@ export interface FlowNode {
 export interface FlowDef {
   name: string;
   label: string;
-  type: 'Screen Flow' | 'Autolaunched Flow' | 'Triggered Flow' | 'Process Builder';
-  status: 'Active' | 'Draft';
+  type: 'Screen Flow' | 'Autolaunched Flow' | 'Triggered Flow' | 'Process Builder' | 'Workflow';
+  status: 'Active' | 'Draft' | 'Obsolete';
   triggerType?: 'RecordBeforeSave' | 'RecordAfterSave' | 'Schedule' | 'PlatformEvent';
   triggerObject?: string;
   nodes: FlowNode[];
   description?: string;
+  variables?: { name: string; type: string; isInput: boolean; isOutput: boolean }[];
+  metadataXml?: string;
 }
 
 export interface ValidationRuleDef {
@@ -163,10 +184,29 @@ export interface ComponentDef {
   description?: string;
 }
 
+export interface LayoutSectionDef {
+  name: string;
+  label: string;
+  columns: number;
+  fields: { name: string; behavior: 'Required' | 'Edit' | 'Readonly' }[];
+}
+
+export interface PageLayoutDef {
+  name: string; // Object-LayoutName
+  label: string;
+  objectType: string;
+  sections: LayoutSectionDef[];
+  relatedLists?: string[];
+}
+
 export interface ProfileDef {
   name: string;
   userLicense: string;
   custom: boolean;
+  permissions?: {
+    objectPermissions: { [key: string]: { allowRead: boolean; allowCreate: boolean; allowEdit: boolean; allowDelete: boolean } };
+    fieldPermissions: { [key: string]: { allowRead: boolean; allowEdit: boolean } };
+  };
 }
 
 export interface SharingRuleDef {
@@ -174,6 +214,8 @@ export interface SharingRuleDef {
   label: string;
   accessLevel: 'Read' | 'Edit' | 'All';
   type: 'OwnerBased' | 'CriteriaBased';
+  rowCause?: string;
+  sharedTo?: string;
 }
 
 export interface MetadataSummary {
@@ -185,6 +227,7 @@ export interface MetadataSummary {
   components: ComponentDef[];
   profiles: ProfileDef[];
   sharingRules: SharingRuleDef[];
+  layouts?: PageLayoutDef[];
   permissions?: number;
   fetchedAt: Date;
   details?: any; // Full JSON dump for AI context
