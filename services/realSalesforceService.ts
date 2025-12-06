@@ -71,8 +71,8 @@ const getEnvironmentConfig = (forceEnv?: 'local' | 'prod') => {
     // 🎯 REQUIREMENT #3: Environment-Aware Redirect
     const REDIRECT_URI = config.redirectUri;
 
-    // 🎯 REQUIREMENT #5: Proxy only in local mode (optional)
-    const PROXY_URL = isLocal && config.apiUrl ? config.apiUrl.replace(/\/+$/, '') : '';
+    // 🎯 REQUIREMENT #5: Proxy usage (Local or Prod via Vercel)
+    const PROXY_URL = config.apiUrl ? config.apiUrl.replace(/\/+$/, '') : '';
 
     // 🎯 REQUIREMENT #4: Server-Side Token Exchange Route (must not go through proxy)
     // If client-side (browser) environment, use window.location.origin so fetch('/api/...') resolves correctly.
