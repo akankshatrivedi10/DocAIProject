@@ -5,7 +5,7 @@ export interface JiraStory {
     key: string;
     title: string;
     description: string;
-    acceptanceCriteria: string; // Often custom field or description
+    acceptanceCriteria: string;
     status: string;
     epic?: string;
     projectKey: string;
@@ -17,93 +17,57 @@ export interface JiraProject {
     id: string;
 }
 
-// Credentials Cache (in-memory) - synced with App.tsx via UI but good to have handy
-let cachedCreds: { domain: string, email: string, token: string } | null = null;
-const CRED_STORAGE_KEY = 'jira_credentials';
-
-const getCredentials = () => {
-    if (cachedCreds) return cachedCreds;
+const getStoredConnectionId = () => {
     if (typeof window === 'undefined') return null;
-    const stored = localStorage.getItem(CRED_STORAGE_KEY);
-    if (!stored) return null;
-    try {
-        return JSON.parse(stored);
-    } catch {
-        return null;
-    }
+    return localStorage.getItem('jira_connection_id');
 };
 
 /**
  * Helper to construct Proxy URL based on environment
  */
-const getProxyUrl = (targetUrl: string): string => {
+const getProxyApiUrl = (targetPath: string): string => {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+    // Target Path: e.g., /rest/api/3/project
+    // API Route: /api/jira/proxy?path=...
+
     if (isLocal) {
-        // Localhost: http://localhost:8080/https://domain...
-        return `${ENV_CONFIG.LOCALHOST.apiUrl}/${targetUrl}`;
+        return `http://localhost:8080/api/jira/proxy?path=${encodeURIComponent(targetPath)}`;
     } else {
-        // Production: /api/proxy?proxyUrl=https://domain...
-        // Ensure proxyUrl is encoded
-        return `/api/proxy?proxyUrl=${encodeURIComponent(targetUrl)}`;
+        return `/api/jira/proxy?path=${encodeURIComponent(targetPath)}`;
     }
 };
 
 /**
- * Authenticate with Jira by calling /myself
+ * Authenticate with Jira - Decommissioned for OAuth 2.0
  */
 export const authenticateJira = async (domain: string, email: string, token: string): Promise<boolean> => {
-    // Normalize domain
-    let cleanDomain = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
-    if (!cleanDomain.includes('.')) cleanDomain += '.atlassian.net'; // Fallback convenience
+    console.warn("Legacy Auth called. Use OAuth 2.0 flow.");
+    return false;
+};
 
-    const targetUrl = `https://${cleanDomain}/rest/api/3/myself`;
-    const proxyUrl = getProxyUrl(targetUrl);
+/**
+ * Fetch accessible projects via OAuth Proxy
+ */
+export const getJiraProjects = async (): Promise<JiraProject[]> => {
+    const connectionId = getStoredConnectionId();
+    if (!connectionId) throw new Error("No Jira connection found. Please connect via Integration settings.");
 
-    // Basic Auth
-    const authHeader = 'Basic ' + btoa(`${email}:${token}`);
+    const proxyUrl = getProxyApiUrl('/rest/api/3/project');
 
     try {
         const response = await fetch(proxyUrl, {
-            method: 'GET',
             headers: {
-                'Authorization': authHeader,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-Jira-Connection-Id': connectionId
             }
         });
 
-        if (response.status === 200) {
-            // Success! Save credentials
-            const creds = { domain: cleanDomain, email, token };
-            cachedCreds = creds;
-            localStorage.setItem(CRED_STORAGE_KEY, JSON.stringify(creds));
-            return true;
-        } else {
-            console.warn('Jira Auth Failed:', response.status, await response.text());
-            return false;
+        if (response.status === 401) {
+            // Token expired or invalid
+            throw new Error("Jira Session Expired. Please reconnect.");
         }
-    } catch (e) {
-        console.error('Jira Auth Error:', e);
-        return false;
-    }
-};
 
-/**
- * Fetch accessible projects
- */
-export const getJiraProjects = async (): Promise<JiraProject[]> => {
-    const creds = getCredentials();
-    if (!creds) throw new Error("Not authenticated with Jira");
-
-    const targetUrl = `https://${creds.domain}/rest/api/3/project`;
-    const proxyUrl = getProxyUrl(targetUrl);
-    const authHeader = 'Basic ' + btoa(`${creds.email}:${creds.token}`);
-
-    try {
-        const response = await fetch(proxyUrl, {
-            headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
-        });
         if (!response.ok) throw new Error(`Failed to fetch projects: ${response.statusText}`);
 
         const data = await response.json();
@@ -126,24 +90,25 @@ export const searchJiraStories = async (
     searchQuery: string = '',
     maxResults: number = 50
 ): Promise<JiraStory[]> => {
-    const creds = getCredentials();
-    if (!creds) throw new Error("Not authenticated with Jira");
+    const connectionId = getStoredConnectionId();
+    if (!connectionId) throw new Error("No Jira connection found.");
 
     // JQL Construction
-    // Default to type in (Story, Epic, Task) because strict "Story" might miss things user cares about
     let jql = `project = "${projectKey}" AND issuetype in (Story, Epic, Task, Bug)`;
     if (searchQuery) {
         jql += ` AND (summary ~ "${searchQuery}" OR description ~ "${searchQuery}")`;
     }
     jql += ' ORDER BY created DESC';
 
-    const targetUrl = `https://${creds.domain}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,issuetype,parent`;
-    const proxyUrl = getProxyUrl(targetUrl);
-    const authHeader = 'Basic ' + btoa(`${creds.email}:${creds.token}`);
+    const targetPath = `/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,issuetype,parent`;
+    const proxyUrl = getProxyApiUrl(targetPath);
 
     try {
         const response = await fetch(proxyUrl, {
-            headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
+            headers: {
+                'Accept': 'application/json',
+                'X-Jira-Connection-Id': connectionId
+            }
         });
         if (!response.ok) throw new Error(`Failed to search stories: ${response.statusText}`);
 
@@ -155,10 +120,9 @@ export const searchJiraStories = async (
             key: i.key,
             projectKey,
             title: i.fields.summary,
-            // Jira description is complex (ADF). Simple fallback to string if possible or "Complex Content"
             description: parseADF(i.fields.description),
             status: i.fields.status?.name || 'Unknown',
-            acceptanceCriteria: '', // Custom field logic omitted for simplicity, can iterate later
+            acceptanceCriteria: '',
             epic: i.fields.parent?.key
         }));
     } catch (e) {

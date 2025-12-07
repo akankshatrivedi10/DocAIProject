@@ -13,6 +13,7 @@ import { Tab, Org, OrgType, ConnectionStatus, SyncStage, Integration, Integratio
 import { login } from './services/authService';
 import SignUp from './components/Auth/SignUp';
 import EmailVerification from './components/Auth/EmailVerification';
+import JiraOAuthCallback from './components/JiraOAuthCallback';
 import SalesConsole from './components/Internal/SalesConsole';
 // Switched to real service
 // Switched to real service
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const [oauthOrgType, setOauthOrgType] = useState<OrgType>(OrgType.PRODUCTION);
 
   const [isOAuthCallback, setIsOAuthCallback] = useState(window.location.pathname === '/oauth/callback');
+  const [isJiraOAuthCallback, setIsJiraOAuthCallback] = useState(window.location.pathname === '/jira/oauth/callback');
 
   useEffect(() => {
     // Check for existing session (mock)
@@ -111,12 +113,12 @@ const App: React.FC = () => {
       setAuthView('APP');
     }
     // Don't auto-redirect to landing - let explicit logout handle it
-  }, [currentUser, authView, isOAuthCallback]);
+  }, [currentUser, authView, isOAuthCallback, isJiraOAuthCallback]);
 
   // Check for Jira Credentials
   useEffect(() => {
-    const jiraCreds = localStorage.getItem('jira_credentials');
-    if (jiraCreds) {
+    const jiraConnId = localStorage.getItem('jira_connection_id');
+    if (jiraConnId) {
       setIntegrations(prev => prev.map(i =>
         i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED, environment: 'production' } : i
       ));
@@ -387,6 +389,28 @@ const App: React.FC = () => {
           console.error("OAuth Callback Error", err);
           setIsOAuthCallback(false);
           alert(`Connection Failed: ${err}`);
+        }}
+      />
+    );
+  }
+
+  if (isJiraOAuthCallback) {
+    return (
+      <JiraOAuthCallback
+        onSuccess={(connId) => {
+          setIsJiraOAuthCallback(false);
+          window.history.replaceState({}, document.title, "/");
+          setIntegrations(prev => prev.map(i =>
+            i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED, environment: 'production' } : i
+          ));
+          setAuthView('APP');
+          setActiveTab(Tab.INTEGRATIONS);
+          alert('Jira Connected Successfully via OAuth 2.0!');
+        }}
+        onError={(err) => {
+          alert(`Jira Connection Failed: ${err}`);
+          setIsJiraOAuthCallback(false);
+          window.history.replaceState({}, document.title, "/");
         }}
       />
     );

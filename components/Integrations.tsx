@@ -30,23 +30,18 @@ const Integrations: React.FC<IntegrationsProps> = ({
     const [jiraError, setJiraError] = React.useState('');
     const [jiraEnvironment, setJiraEnvironment] = React.useState<'production' | 'test'>('production');
 
-    const handleConnectJira = async () => {
-        setIsConnectingJira(true);
-        setJiraError('');
-        try {
-            const success = await import('../services/jiraService').then(m => m.authenticateJira(jiraCreds.domain, jiraCreds.email, jiraCreds.token));
-            if (success) {
-                if (onConnectJira) onConnectJira(jiraEnvironment);
-                setShowJiraModal(false);
-                // alert(`Jira ${jiraEnvironment} integration connected successfully...`); // Removed alert for smoother UX
-            } else {
-                setJiraError('Jira authentication failed. Please check your credentials (domain, email, API token).');
-            }
-        } catch (e) {
-            setJiraError('An error occurred while connecting to Jira.');
-        } finally {
-            setIsConnectingJira(false);
-        }
+    const handleConnectJira = () => {
+        // OAuth 2.0 Flow
+        const clientId = import.meta.env.VITE_JIRA_CLIENT_ID || 'PENDING_ENV_VAR';
+        const redirectUri = window.location.hostname === 'localhost'
+            ? 'http://localhost:3000/jira/oauth/callback'
+            : 'https://doc-ai-project.vercel.app/jira/oauth/callback';
+
+        const scope = 'read:jira-work read:jira-user offline_access';
+        const state = Math.random().toString(36).substring(7);
+        const authUrl = `https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id=${clientId}&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&response_type=code&prompt=consent`;
+
+        window.location.href = authUrl;
     };
 
     const handleUseMockConnection = () => {
@@ -195,7 +190,7 @@ const Integrations: React.FC<IntegrationsProps> = ({
                         <IntegrationCard
                             key={int.id}
                             integration={int}
-                            onConnect={() => int.type === IntegrationType.JIRA ? setShowJiraModal(true) : null}
+                            onConnect={() => int.type === IntegrationType.JIRA ? handleConnectJira() : null}
                             delay={0.35 + index * 0.05}
                         />
                     ))}
