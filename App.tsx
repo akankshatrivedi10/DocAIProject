@@ -113,6 +113,16 @@ const App: React.FC = () => {
     // Don't auto-redirect to landing - let explicit logout handle it
   }, [currentUser, authView, isOAuthCallback]);
 
+  // Check for Jira Credentials
+  useEffect(() => {
+    const jiraCreds = localStorage.getItem('jira_credentials');
+    if (jiraCreds) {
+      setIntegrations(prev => prev.map(i =>
+        i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED, environment: 'production' } : i
+      ));
+    }
+  }, []);
+
   const activeOrg = orgs.find(o => o.id === activeOrgId) || null;
 
   const handleAuthSuccess = (user: User, profile: CustomerProfile) => {
@@ -563,6 +573,8 @@ const App: React.FC = () => {
               setIntegrations(prev => prev.map(i =>
                 i.type === IntegrationType.JIRA ? { ...i, status: ConnectionStatus.CONNECTED, environment: env } : i
               ));
+              // Force update or toast?
+              alert("Jira Connected Successfully!");
             }}
           />}
           {activeTab === Tab.METADATA && <MetadataExplorer activeOrg={activeOrg} selectedItems={selectedMetadataItems} onSelectionChange={setSelectedMetadataItems} />}

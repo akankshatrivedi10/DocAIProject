@@ -1,142 +1,183 @@
-import { ConnectionStatus } from '../types';
+import { ENV_CONFIG } from '../config/envConfig';
 
 export interface JiraStory {
     id: string;
     key: string;
     title: string;
     description: string;
-    acceptanceCriteria: string;
+    acceptanceCriteria: string; // Often custom field or description
     status: string;
     epic?: string;
+    projectKey: string;
 }
 
 export interface JiraProject {
     key: string;
     name: string;
+    id: string;
 }
 
-// Mock data for simulation
-const MOCK_PROJECTS: JiraProject[] = [
-    { key: 'PROJ', name: 'Core Platform' },
-    { key: 'MOB', name: 'Mobile App' },
-    { key: 'API', name: 'API Gateway' },
-    { key: 'TEST-PROJ', name: 'Mock Test Project' }
-];
+// Credentials Cache (in-memory) - synced with App.tsx via UI but good to have handy
+let cachedCreds: { domain: string, email: string, token: string } | null = null;
+const CRED_STORAGE_KEY = 'jira_credentials';
 
-const MOCK_STORIES: Record<string, JiraStory[]> = {
-    'PROJ': [
-        {
-            id: '10001',
-            key: 'PROJ-1234',
-            title: 'Implement Lead Conversion Flow',
-            description: 'As a Sales Rep, I need to convert Leads to Opportunities with specific mapping rules so that data integrity is maintained.',
-            acceptanceCriteria: '- Lead Status must be "Qualified" before conversion\n- Opportunity Amount must be calculated based on Lead Score\n- Contact must be created if not exists',
-            status: 'In Progress',
-            epic: 'PROJ-1000'
-        },
-        {
-            id: '10002',
-            key: 'PROJ-1235',
-            title: 'Automate Opportunity Stage Updates',
-            description: 'Automatically update Opportunity Stage to "Negotiation" when a Quote is approved.',
-            acceptanceCriteria: '- Trigger on Quote Status Change\n- Update Opp Stage\n- Send Email Notification',
-            status: 'To Do',
-            epic: 'PROJ-1000'
-        }
-    ],
-    'MOB': [
-        {
-            id: '20001',
-            key: 'MOB-55',
-            title: 'Login Screen Redesign',
-            description: 'Update the login screen to match the new design system.',
-            acceptanceCriteria: '- Use new color palette\n- Add biometric login option',
-            status: 'Done'
-        }
-    ],
-    'TEST-PROJ': [
-        {
-            id: '90001',
-            key: 'TEST-101',
-            title: 'Test Jira Story for Validation',
-            description: 'This is a mock story used for testing the Jira integration features without connecting to a real instance.',
-            acceptanceCriteria: '- Verify connection is successful\n- Select this story in Dev Workspace\n- Generate documentation using this context',
-            status: 'In Progress',
-            epic: 'TEST-EPIC-1'
-        },
-        {
-            id: '90002',
-            key: 'TEST-102',
-            title: 'Another Mock Story',
-            description: 'Secondary story to test search and selection functionality.',
-            acceptanceCriteria: '- Search for "Another"\n- Verify details appear in preview',
-            status: 'To Do'
-        }
-    ]
+const getCredentials = () => {
+    if (cachedCreds) return cachedCreds;
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem(CRED_STORAGE_KEY);
+    if (!stored) return null;
+    try {
+        return JSON.parse(stored);
+    } catch {
+        return null;
+    }
 };
 
+/**
+ * Helper to construct Proxy URL based on environment
+ */
+const getProxyUrl = (targetUrl: string): string => {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isLocal) {
+        // Localhost: http://localhost:8080/https://domain...
+        return `${ENV_CONFIG.LOCALHOST.apiUrl}/${targetUrl}`;
+    } else {
+        // Production: /api/proxy?proxyUrl=https://domain...
+        // Ensure proxyUrl is encoded
+        return `/api/proxy?proxyUrl=${encodeURIComponent(targetUrl)}`;
+    }
+};
+
+/**
+ * Authenticate with Jira by calling /myself
+ */
 export const authenticateJira = async (domain: string, email: string, token: string): Promise<boolean> => {
-    // Simulate API call
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            if (domain && email && token) {
-                resolve(true);
-            } else {
-                resolve(false);
+    // Normalize domain
+    let cleanDomain = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
+    if (!cleanDomain.includes('.')) cleanDomain += '.atlassian.net'; // Fallback convenience
+
+    const targetUrl = `https://${cleanDomain}/rest/api/3/myself`;
+    const proxyUrl = getProxyUrl(targetUrl);
+
+    // Basic Auth
+    const authHeader = 'Basic ' + btoa(`${email}:${token}`);
+
+    try {
+        const response = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             }
-        }, 1500);
-    });
+        });
+
+        if (response.status === 200) {
+            // Success! Save credentials
+            const creds = { domain: cleanDomain, email, token };
+            cachedCreds = creds;
+            localStorage.setItem(CRED_STORAGE_KEY, JSON.stringify(creds));
+            return true;
+        } else {
+            console.warn('Jira Auth Failed:', response.status, await response.text());
+            return false;
+        }
+    } catch (e) {
+        console.error('Jira Auth Error:', e);
+        return false;
+    }
 };
 
+/**
+ * Fetch accessible projects
+ */
 export const getJiraProjects = async (): Promise<JiraProject[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => resolve(MOCK_PROJECTS), 500);
-    });
+    const creds = getCredentials();
+    if (!creds) throw new Error("Not authenticated with Jira");
+
+    const targetUrl = `https://${creds.domain}/rest/api/3/project`;
+    const proxyUrl = getProxyUrl(targetUrl);
+    const authHeader = 'Basic ' + btoa(`${creds.email}:${creds.token}`);
+
+    try {
+        const response = await fetch(proxyUrl, {
+            headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error(`Failed to fetch projects: ${response.statusText}`);
+
+        const data = await response.json();
+        return data.map((p: any) => ({
+            key: p.key,
+            name: p.name,
+            id: p.id
+        }));
+    } catch (e) {
+        console.error("getJiraProjects failed", e);
+        return [];
+    }
 };
 
-export const getJiraStories = async (projectKey: string): Promise<JiraStory[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => resolve(MOCK_STORIES[projectKey] || []), 500);
-    });
-};
-
-// Search stories within a project
+/**
+ * Search stories (Issues of type 'Story' or similar) in a project
+ */
 export const searchJiraStories = async (
     projectKey: string,
-    searchQuery: string,
+    searchQuery: string = '',
     maxResults: number = 50
 ): Promise<JiraStory[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const allStories = MOCK_STORIES[projectKey] || [];
-            if (!searchQuery.trim()) {
-                resolve(allStories.slice(0, maxResults));
-                return;
-            }
+    const creds = getCredentials();
+    if (!creds) throw new Error("Not authenticated with Jira");
 
-            const filtered = allStories.filter(story =>
-                story.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                story.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                story.description.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            resolve(filtered.slice(0, maxResults));
-        }, 300);
-    });
+    // JQL Construction
+    // Default to type in (Story, Epic, Task) because strict "Story" might miss things user cares about
+    let jql = `project = "${projectKey}" AND issuetype in (Story, Epic, Task, Bug)`;
+    if (searchQuery) {
+        jql += ` AND (summary ~ "${searchQuery}" OR description ~ "${searchQuery}")`;
+    }
+    jql += ' ORDER BY created DESC';
+
+    const targetUrl = `https://${creds.domain}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=summary,description,status,issuetype,parent`;
+    const proxyUrl = getProxyUrl(targetUrl);
+    const authHeader = 'Basic ' + btoa(`${creds.email}:${creds.token}`);
+
+    try {
+        const response = await fetch(proxyUrl, {
+            headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error(`Failed to search stories: ${response.statusText}`);
+
+        const data = await response.json();
+        const issues = data.issues || [];
+
+        return issues.map((i: any) => ({
+            id: i.id,
+            key: i.key,
+            projectKey,
+            title: i.fields.summary,
+            // Jira description is complex (ADF). Simple fallback to string if possible or "Complex Content"
+            description: parseADF(i.fields.description),
+            status: i.fields.status?.name || 'Unknown',
+            acceptanceCriteria: '', // Custom field logic omitted for simplicity, can iterate later
+            epic: i.fields.parent?.key
+        }));
+    } catch (e) {
+        console.error("searchJiraStories failed", e);
+        return [];
+    }
 };
 
-// Get detailed story information
-export const getJiraStoryDetails = async (storyKey: string): Promise<JiraStory | null> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            // Search through all projects
-            for (const stories of Object.values(MOCK_STORIES)) {
-                const found = stories.find(s => s.key === storyKey);
-                if (found) {
-                    resolve(found);
-                    return;
-                }
+// Simplified Atlassian Document Format parser fallback
+const parseADF = (desc: any): string => {
+    if (!desc) return '';
+    if (typeof desc === 'string') return desc;
+    if (desc.type === 'doc' && desc.content) {
+        return desc.content.map((block: any) => {
+            if (block.type === 'paragraph' && block.content) {
+                return block.content.map((c: any) => c.text).join('');
             }
-            resolve(null);
-        }, 300);
-    });
+            return '';
+        }).join('\n');
+    }
+    return 'Detailed description available in Jira.';
 };

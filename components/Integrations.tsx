@@ -38,9 +38,9 @@ const Integrations: React.FC<IntegrationsProps> = ({
             if (success) {
                 if (onConnectJira) onConnectJira(jiraEnvironment);
                 setShowJiraModal(false);
-                alert(`Jira ${jiraEnvironment} integration connected successfully. You can now select a Jira Story to include its context in your Technical Documentation.`);
+                // alert(`Jira ${jiraEnvironment} integration connected successfully...`); // Removed alert for smoother UX
             } else {
-                setJiraError('Jira authentication failed. Please check your credentials or permissions.');
+                setJiraError('Jira authentication failed. Please check your credentials (domain, email, API token).');
             }
         } catch (e) {
             setJiraError('An error occurred while connecting to Jira.');
