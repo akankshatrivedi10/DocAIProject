@@ -177,7 +177,7 @@ Epic: ${selectedStoryDetails.epic || 'None'}
                 <div className="space-y-6 overflow-y-auto pr-2">
 
                     {/* Jira Context Section */}
-                    <Card className="p-4">
+                    <Card className="p-4 overflow-visible">
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jira Story Context</h3>
                             {isJiraConnected && (
@@ -238,8 +238,8 @@ Epic: ${selectedStoryDetails.epic || 'None'}
                                                         <div className="flex justify-between items-start mb-1">
                                                             <span className="font-semibold text-slate-700 text-sm">{story.key}</span>
                                                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${story.status === 'Done' ? 'bg-green-100 text-green-700' :
-                                                                    story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                                                                        'bg-slate-100 text-slate-600'
+                                                                story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-slate-100 text-slate-600'
                                                                 }`}>
                                                                 {story.status}
                                                             </span>
