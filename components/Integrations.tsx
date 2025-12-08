@@ -32,10 +32,10 @@ const Integrations: React.FC<IntegrationsProps> = ({
 
     const handleConnectJira = () => {
         // OAuth 2.0 Flow
-        const clientId = import.meta.env.VITE_JIRA_CLIENT_ID;
+        const clientId = import.meta.env.JIRA_CLIENT_ID;
 
         if (!clientId || clientId === 'PENDING_ENV_VAR') {
-            alert('Configuration Error: VITE_JIRA_CLIENT_ID is missing in .env file.\nPlease add your Atlassian Client ID and restart the app.');
+            alert('Configuration Error: JIRA_CLIENT_ID is missing in .env file.\nPlease add your Atlassian Client ID and restart the app.');
             return;
         }
 
