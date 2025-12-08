@@ -43,7 +43,7 @@ const Integrations: React.FC<IntegrationsProps> = ({
             ? 'http://localhost:3000/jira/oauth/callback'
             : 'https://doc-ai-project.vercel.app/jira/oauth/callback';
 
-        const scope = 'read:jira-work read:jira-user offline_access';
+        const scope = 'read:jira-work read:jira-user';
         const state = Math.random().toString(36).substring(7);
         const authUrl = `https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id=${clientId}&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&response_type=code&prompt=consent`;
 
